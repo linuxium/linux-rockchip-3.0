@@ -18,6 +18,7 @@
 #define _LINUX_ION_H
 
 #include <linux/types.h>
+#define ION_VERSION     "1.0"
 
 struct ion_handle;
 /**
@@ -36,6 +37,14 @@ enum ion_heap_type {
 	ION_HEAP_TYPE_CUSTOM, /* must be last so device specific heaps always
 				 are at the end of this enum */
 	ION_NUM_HEAPS,
+};
+enum ion_heap_ids {
+	ION_NOR_HEAP_ID = 0,
+	ION_CMA_HEAP_ID = 1,
+	
+	ION_VPU_ID = 16,
+	ION_CAM_ID = 17,
+	ION_UI_ID = 18,
 };
 
 #define ION_HEAP_SYSTEM_MASK		(1 << ION_HEAP_TYPE_SYSTEM)
@@ -285,6 +294,36 @@ struct ion_custom_data {
 	unsigned long arg;
 };
 
+struct ion_phys_data {
+	struct ion_handle *handle;
+	unsigned long phys;
+	unsigned long size;
+};
+struct ion_cacheop_data {
+#define ION_CACHE_FLUSH		0
+#define ION_CACHE_CLEAN		1
+#define ION_CACHE_INV		2
+	unsigned int type;
+	struct ion_handle *handle;
+	void *virt;
+};
+struct ion_buffer_info {
+	unsigned long phys;
+	unsigned long size;
+};
+struct ion_client_info {
+#define MAX_BUFFER_COUNT	127
+	unsigned int count;
+	unsigned long total_size;
+	struct ion_buffer_info buf[MAX_BUFFER_COUNT];
+};
+struct ion_heap_info {
+	unsigned int id;
+	unsigned long allocated_size;
+	unsigned long max_allocated;
+	unsigned long total_size;
+};
+
 #define ION_IOC_MAGIC		'I'
 
 /**
@@ -339,6 +378,24 @@ struct ion_custom_data {
  * Takes the argument of the architecture specific ioctl to call and
  * passes appropriate userdata for that ioctl
  */
-#define ION_IOC_CUSTOM		_IOWR(ION_IOC_MAGIC, 6, struct ion_custom_data)
+#define ION_IOC_CUSTOM			_IOWR(ION_IOC_MAGIC, 6, struct ion_custom_data)
 
+#define ION_CUSTOM_GET_PHYS		_IOWR(ION_IOC_MAGIC, 7, \
+				      		struct ion_phys_data)
+				      
+#define ION_CUSTOM_CACHE_OP		_IOWR(ION_IOC_MAGIC, 8, \
+				      		struct ion_cacheop_data) 				     
+
+#define ION_CUSTOM_GET_CLIENT_INFO	_IOWR(ION_IOC_MAGIC, 9, \
+				      		struct ion_client_info) 
+
+#define ION_CUSTOM_GET_HEAP_INFO	_IOWR(ION_IOC_MAGIC, 10, \
+				      		struct ion_heap_info) 
+/* Compatible with pmem */
+struct ion_pmem_region {
+	unsigned long offset;
+	unsigned long len;
+};
+#define ION_PMEM_GET_PHYS		_IOW('p', 1, unsigned int)
+#define ION_PMEM_CACHE_FLUSH		_IOW('p', 8, unsigned int)
 #endif /* _LINUX_ION_H */

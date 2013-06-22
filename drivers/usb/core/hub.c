@@ -482,15 +482,12 @@ static void hub_tt_work(struct work_struct *work)
 	int			limit = 100;
 
 	spin_lock_irqsave (&hub->tt.lock, flags);
-	while (!list_empty(&hub->tt.clear_list)) {
+	while (--limit && !list_empty (&hub->tt.clear_list)) {
 		struct list_head	*next;
 		struct usb_tt_clear	*clear;
 		struct usb_device	*hdev = hub->hdev;
 		const struct hc_driver	*drv;
 		int			status;
-
-		if (!hub->quiescing && --limit < 0)
-			break;
 
 		next = hub->tt.clear_list.next;
 		clear = list_entry (next, struct usb_tt_clear, clear_list);
@@ -955,7 +952,7 @@ static void hub_quiesce(struct usb_hub *hub, enum hub_quiescing_type type)
 	if (hub->has_indicators)
 		cancel_delayed_work_sync(&hub->leds);
 	if (hub->tt.hub)
-		flush_work_sync(&hub->tt.clear_work);
+		cancel_work_sync(&hub->tt.clear_work);
 }
 
 /* caller has locked the hub device */
@@ -1286,7 +1283,7 @@ static void hub_disconnect(struct usb_interface *intf)
 
 	kref_put(&hub->kref, hub_release);
 }
-
+struct usb_hub *g_root_hub20 = NULL;
 static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_host_interface *desc;
@@ -1346,7 +1343,10 @@ descriptor_error:
 		dev_dbg (&intf->dev, "couldn't kmalloc hub struct\n");
 		return -ENOMEM;
 	}
-
+	if(!g_root_hub20)
+	{
+		g_root_hub20 = hub;
+	}
 	kref_init(&hub->kref);
 	INIT_LIST_HEAD(&hub->event_list);
 	hub->intfdev = &intf->dev;
@@ -1914,7 +1914,11 @@ int usb_new_device(struct usb_device *udev)
 		add_device_randomness(udev->manufacturer,
 				      strlen(udev->manufacturer));
 
-	device_enable_async_suspend(&udev->dev);
+	/* kever@rk 20111205
+	 * We don't use async suspend in rk29 usb
+	 * to make sure usb1.1 host is suspend before usb 2.0 host.
+	 */
+	//device_enable_async_suspend(&udev->dev);
 	/* Register the device.  The device driver is responsible
 	 * for configuring the device and invoking the add-device
 	 * notifier chain (used by usbfs and possibly others).
@@ -2904,11 +2908,17 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 		udev->ttport = hdev->ttport;
 	} else if (udev->speed != USB_SPEED_HIGH
 			&& hdev->speed == USB_SPEED_HIGH) {
+			
+	/* yk@rk 20110617
+	 * parent hub has no TT would not be error in rk29
+	 */
+		#if 0
 		if (!hub->tt.hub) {
 			dev_err(&udev->dev, "parent hub has no TT\n");
 			retval = -EINVAL;
 			goto fail;
 		}
+		#endif
 		udev->tt = &hub->tt;
 		udev->ttport = port1;
 	}
@@ -3640,6 +3650,14 @@ static void hub_events(void)
 		kref_put(&hub->kref, hub_release);
 
         } /* end while (1) */
+}
+
+/* yk@rk 20100730 
+ * disconnect all devices on root hub
+ */
+void hub_disconnect_device(struct usb_hub *hub)
+{
+    	hub_port_connect_change(hub, 1, 0, 0x2);
 }
 
 static int hub_thread(void *__unused)

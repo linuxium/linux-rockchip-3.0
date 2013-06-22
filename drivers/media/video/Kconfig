@@ -70,6 +70,7 @@ config VIDEOBUF2_DMA_SG
 # Multimedia Video device configuration
 #
 
+source "drivers/media/video/rk29xx/Kconfig"
 menuconfig VIDEO_CAPTURE_DRIVERS
 	bool "Video capture adapters"
 	depends on VIDEO_V4L2
@@ -803,11 +804,61 @@ config SOC_CAMERA_MT9M111
 	  This driver supports MT9M111, MT9M112 and MT9M131 cameras from
 	  Micron/Aptina
 
+config SOC_CAMERA_MT9M112
+	tristate "mt9m112 support"
+	depends on SOC_CAMERA && I2C
+	help
+	  This driver supports MT9M112 cameras from Micron
+
 config SOC_CAMERA_MT9T031
 	tristate "mt9t031 support"
 	depends on SOC_CAMERA && I2C
 	help
 	  This driver supports MT9T031 cameras from Micron.
+
+config SOC_CAMERA_MT9T111
+	tristate "mt9t111 support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This driver supports MT9T111 cameras from Micron for rockchip.
+
+config MT9T111_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_MT9T111
+	bool "MT9T111 user defined init series"
+	default n
+
+config SOC_CAMERA_MT9P111
+	tristate "mt9p111 support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This driver supports MT9P111 cameras from Micron for rockchip.
+	  
+config MT9P111_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_MT9P111
+	bool "MT9P111 user defined init series"
+	default n
+
+config SOC_CAMERA_MT9D112
+	tristate "mt9d112 support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This driver supports MT9D112 cameras from Micron for rockchip
+
+config MT9D112_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_MT9D112
+	bool "MT9D112 user defined init series"
+	default n
+
+config SOC_CAMERA_MT9D113
+	tristate "mt9d113 support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This driver supports MT9D113 cameras from Micron for rockchip
+
+config MT9D113_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_MT9D113
+	bool "MT9D113 user defined init series"
+	default n
 
 config SOC_CAMERA_MT9T112
 	tristate "mt9t112 support"
@@ -815,12 +866,22 @@ config SOC_CAMERA_MT9T112
 	help
 	  This driver supports MT9T112 cameras from Aptina.
 
+config MT9T112_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_MT9T112
+	bool "MT9T112 user defined init series"
+	default n
+
 config SOC_CAMERA_MT9V022
 	tristate "mt9v022 support"
 	depends on SOC_CAMERA && I2C
 	select GPIO_PCA953X if MT9V022_PCA9536_SWITCH
 	help
 	  This driver supports MT9V022 cameras from Micron
+
+config MT9V022_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_MT9V022
+	bool "MT9V022 user defined init series"
+	default n
 
 config SOC_CAMERA_RJ54N1
 	tristate "rj54n1cb0c support"
@@ -845,12 +906,16 @@ config SOC_CAMERA_OV2640
 	depends on SOC_CAMERA && I2C
 	help
 	  This is a ov2640 camera driver
-
 config SOC_CAMERA_OV6650
 	tristate "ov6650 sensor support"
 	depends on SOC_CAMERA && I2C
 	---help---
 	  This is a V4L2 SoC camera driver for the OmniVision OV6650 sensor
+
+config OV6650_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_OV6650
+	bool "OV6650 user defined init series"
+	default n
 
 config SOC_CAMERA_OV772X
 	tristate "ov772x camera support"
@@ -858,17 +923,394 @@ config SOC_CAMERA_OV772X
 	help
 	  This is a ov772x camera driver
 
+config SOC_CAMERA_OV7675
+	tristate "ov7675 camera support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a ov7675 camera driver for rockchip
+
+config OV7675_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_OV7675
+	bool "OV7675 user defined init series"
+	default n
+
+config SOC_CAMERA_OV2655
+	tristate "ov2655 camera support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a ov2655 camera driver for rockchip
+
+config OV2655_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_OV2655
+	bool "OV2655 user defined init series"
+	default n
+
+config SOC_CAMERA_OV2659
+	tristate "ov2659 camera support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a ov2659 camera driver for rockchip
+	  
+config OV2659_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_OV2659
+	bool "OV2659 user defined init series"
+	default n
+
+config SOC_CAMERA_OV7690
+	tristate "ov7690 camera support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a ov7690 camera driver for rockchip	
+
+config OV7690_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_OV7690
+	bool "OV7690 user defined init series"
+	default n
+
+config SOC_CAMERA_OV9650
+	tristate "ov9650 camera support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a ov9650 camera driver for rockchip
+
+config OV9650_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_OV9650
+	bool "OV9650 user defined init series"
+	default n
+
+config SOC_CAMERA_OV2640_RK
+	tristate "ov2640 camera support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a ov2640 camera driver for rockchip
+	  
+config OV2640_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_OV2640_RK
+	bool "OV2640 user defined init series"
+	default n
+
+config SOC_CAMERA_OV3640
+	tristate "ov3640 camera support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a ov3640 camera driver for rockchip
+	  
+config OV3640_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_OV3640
+	bool "OV3640 user defined init series"
+	default n
+
+choice
+	prompt "OV3640 Module Focus select"
+	depends on SOC_CAMERA_OV3640
+	default OV3640_AUTOFOCUS
+	---help---
+
+config OV3640_AUTOFOCUS
+	bool "OV3640 auto focus"
+
+config OV3640_FIXEDFOCUS
+	bool "OV3640 fixed focus"
+endchoice
+
+config SOC_CAMERA_OV3660
+	tristate "ov3660 camera support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a ov3660 camera driver for rockchip
+	  
+config OV3660_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_OV3660
+	bool "OV3660 user defined init series"
+	default n
+
+config SOC_CAMERA_OV5642
+	tristate "ov5642 camera support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a ov5642 camera driver for rockchip
+
+config OV5642_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_OV5642
+	bool "OV5642 user defined init series"
+	default n
+
+choice
+	prompt "OV5642 Module Focus select"
+	depends on SOC_CAMERA_OV5642
+	default OV5642_AUTOFOCUS
+	---help---
+
+config OV5642_AUTOFOCUS
+	bool "OV5642 auto focus"
+
+config OV5642_FIXEDFOCUS
+	bool "OV5642 fixed focus"
+endchoice
+
+config SOC_CAMERA_OV5640
+	tristate "ov5640 camera support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a ov5640 camera driver for rockchip
+
+config OV5640_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_OV5640
+	bool "OV5640 user defined init series"
+	default n
+
+choice
+	prompt "OV5640 Module Focus select"
+	depends on SOC_CAMERA_OV5640
+	default OV5640_AUTOFOCUS
+	---help---
+
+config OV5640_AUTOFOCUS
+	bool "OV5640 auto focus"
+
+config OV5640_FIXEDFOCUS
+	bool "OV5640 fixed focus"
+endchoice
+
+config SOC_CAMERA_OV5640_FOR_TD8801
+	tristate "ov5640 camera support for td8801"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a ov5640 camera driver for td8801
+choice
+	prompt "OV5640 Module Focus select"
+	depends on SOC_CAMERA_OV5640_FOR_TD8801
+	default OV5640_AUTOFOCUS_FOR_TD8801
+	---help---
+
+config OV5640_AUTOFOCUS_FOR_TD8801
+	bool "OV5640 auto focus"
+
+config OV5640_FIXEDFOCUS_FOR_TD8801
+	bool "OV5640 fixed focus"
+endchoice
+
+config SOC_CAMERA_S5K6AA
+	tristate "Samsung S5K6AA camera support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a samsung S5K6AA camera driver for rockchip
+
+config S5K6AA_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_S5K6AA
+	bool "S5K6AA user defined init series"
+	default n
+
+config SOC_CAMERA_GT2005
+	tristate "GT2005 support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a GT2005 camera driver for rockchip
+
+config GT2005_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_GT2005
+	bool "GT2005 user defined init series"
+	default n
+
+config SOC_CAMERA_GC0307
+	tristate "GC0307 support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a GC0307 camera driver for rockchip	   
+
+config GC0307_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_GC0307
+	bool "GC0307 user defined init series"
+	default n
+
+config SOC_CAMERA_GC0308
+	tristate "GC0308 support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a GC0308 camera driver for rockchip
+
+config GC0308_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_GC0308
+	bool "GC0308 user defined init series"
+	default n
+
+config SOC_CAMERA_GC0309
+	tristate "GC0309 support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a GC0309 camera driver for rockchip
+
+config GC0309_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_GC0309
+	bool "GC0309 user defined init series"
+	default n
+
+config SOC_CAMERA_GC0309_FOR_TD8801
+	tristate "GC0309 support for td8801"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a GC0309 camera driver for td8801
+
+config SOC_CAMERA_GC2015
+	tristate "GC2015 support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a GC2015 camera driver for rockchip
+
+config GC2015_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_GC2015
+	bool "GC2015 user defined init series"
+	default n
+
+config SOC_CAMERA_GC2035
+        tristate "GC2035 support for rockchip"
+        depends on SOC_CAMERA && I2C
+        help
+          This is a GC2035 camera driver for rockchip
+
+config GC2035_USER_DEFINED_SERIES
+        depends on SOC_CAMERA_GC2035
+        bool "GC2035 user defined init series"
+        default n
+
+config SOC_CAMERA_HI253
+	tristate "HI253 support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a HI253 camera driver for rockchip
+
+config HI253_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_HI253
+	bool "HI253 user defined init series"
+	default n
+
+config SOC_CAMERA_HI704
+	tristate "HI704 support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a HI704 camera driver for rockchip
+
+config HI704_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_HI704
+	bool "HI704 user defined init series"
+	default n
+
+config SOC_CAMERA_SIV120B
+	tristate "siv120b support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a SIV120B camera driver for rockchip
+
+config SIV120B_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_SIV120B
+	bool "SIV120B user defined init series"
+	default n
+	
+config SOC_CAMERA_SIV121D
+	tristate "siv121d support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a SIV121D camera driver for rockchip
+	  
+config SOC_CAMERA_SID130B
+	tristate "sid130b support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a SID130B camera driver for rockchip
+
+config SID130B_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_SID130B
+	bool "SID130B user defined init series"
+	default n
+
+config SOC_CAMERA_NT99250
+	tristate "NT99250 support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a NT99250 camera driver for rockchip
+
+config NT99250_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_NT99250
+	bool "NT99250 user defined init series"
+	default n
+
+config SOC_CAMERA_GC0329
+	tristate "gc0329 camera support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a gc0329 camera driver for rockchip
+	  
+config GC0329_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_GC0329
+	bool "GC0329 user defined init series"
+	default n
+
+config SOC_CAMERA_S5K5CA
+	tristate "s5k5ca camera support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a s5k5ca camera driver for rockchip
+	  
+config S5K5CA_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_S5K5CA
+	bool "s5k5ca user defined init series"
+	default n
+
+config SOC_CAMERA_MTK9335ISP
+        tristate "mtk9335isp camera support for rockchip"
+        depends on SOC_CAMERA && I2C
+        help
+          This is a mtk9335isp camera driver for rockchip
+
+config MTK9335ISP_USER_DEFINED_SERIES
+        depends on SOC_CAMERA_MTK9335ISP
+        bool "mtk9335isp user defined init series"
+        default n
+
+config SOC_CAMERA_SP0838
+	tristate "sp0838 camera support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a sp0838 camera driver for rockchip
+	  
+config SP0838_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_SP0838
+	bool "sp0838 user defined init series"
+	default n
+
+config SOC_CAMERA_SP2518
+	tristate "sp2518 camera support for rockchip"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a sp2518 camera driver for rockchip
+	  
+config SP2518_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_SP2518
+	bool "sp2518 user defined init series"
+	default n	
+
+
 config SOC_CAMERA_OV9640
 	tristate "ov9640 camera support"
 	depends on SOC_CAMERA && I2C
 	help
 	  This is a ov9640 camera driver
 
+config OV9640_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_OV9640
+	bool "OV9640 user defined init series"
+	default n
+
 config SOC_CAMERA_OV9740
 	tristate "ov9740 camera support"
 	depends on SOC_CAMERA && I2C
 	help
 	  This is a ov9740 camera driver
+
+config OV9740_USER_DEFINED_SERIES
+	depends on SOC_CAMERA_OV9740
+	bool "OV9740 user defined init series"
+	default n
 
 config MX1_VIDEO
 	bool
@@ -927,6 +1369,81 @@ config VIDEO_OMAP2
 	select VIDEOBUF_DMA_SG
 	---help---
 	  This is a v4l2 driver for the TI OMAP2 camera capture interface
+
+config VIDEO_RK29
+	tristate "RKXX Camera Sensor Interface driver"
+	depends on VIDEO_DEV && PLAT_RK && SOC_CAMERA && HAS_DMA
+	select VIDEOBUF_DMA_CONTIG
+	---help---
+	  This is a v4l2 driver for the RK29XX Camera Sensor Interface
+
+choice
+	prompt "RKXX Camera Sensor Interface Work Mode"
+	depends on VIDEO_RK29
+	default VIDEO_RKCIF_WORK_ONEFRAME
+	---help---
+		RK29 Camera Sensor Interface(VIP) can work in 2 modes, ie:OneFrame,PingPong.
+
+config VIDEO_RKCIF_WORK_ONEFRAME
+	bool "CIF OneFrame Mode"
+
+config VIDEO_RKCIF_WORK_PINGPONG
+	bool "CIF PingPong Mode"
+
+endchoice
+
+choice
+	prompt "RKXX camera sensor interface work with IPP "
+	depends on VIDEO_RK29 && RK29_IPP
+	default VIDEO_RK29_WORK_IPP
+	---help---
+		RK29 Camera Sensor Interface(VIP) can work with IPP or not IPP
+
+config VIDEO_RK29_WORK_IPP
+	bool "CIF work with IPP"
+
+config VIDEO_RK29_WORK_NOT_IPP
+	bool "CIF don't work with IPP"
+
+endchoice
+choice
+	prompt "RKXX camera digital zoom with IPP "
+	depends on VIDEO_RK29 && RK29_IPP && VIDEO_RK29_WORK_IPP
+	default VIDEO_RK29_DIGITALZOOM_IPP_ON
+	---help---
+		RK Camera digital zoom with IPP
+config VIDEO_RK29_DIGITALZOOM_IPP_ON
+	bool "Digital zoom with IPP on"
+
+config VIDEO_RK29_DIGITALZOOM_IPP_OFF
+	bool "Digital zoom with IPP off"
+endchoice
+
+choice
+	prompt "RKXX camera memory "
+	depends on VIDEO_RK29 
+	default VIDEO_RK29_CAMMEM_PMEM
+	---help---
+		where camera memory which is used for preview/raw/jpeg in android camera hal is alloced 
+config VIDEO_RK29_CAMMEM_PMEM
+	bool "Camera memory from pmem"
+
+config VIDEO_RK29_CAMMEM_ION
+	bool "Camera memory from ion"
+endchoice
+
+choice
+	prompt "RKXX CIF work simultaneity"
+	depends on VIDEO_RK29 && ARCH_RK30
+	default VIDEO_RKCIF_WORK_SIMUL_OFF
+	---help---
+               CIFs work simultaneity 
+config VIDEO_RKCIF_WORK_SIMUL_ON
+	bool "Two cif controller can work sumultaneity"
+
+config VIDEO_RKCIF_WORK_SIMUL_OFF
+	bool "Two cif controller cann't work sumultaneity"
+endchoice
 
 config VIDEO_MX2_HOSTSUPPORT
 	bool

@@ -6,6 +6,7 @@ menu "Display device support"
 
 config DISPLAY_SUPPORT
 	tristate "Display panel/monitor support"
+	depends on FB_RK29 || FB_ROCKCHIP
 	---help---
 	  This framework adds support for low-level control of a display.
 	  This includes support for power.
@@ -20,5 +21,9 @@ config DISPLAY_SUPPORT
 
 comment "Display hardware drivers"
 	depends on DISPLAY_SUPPORT
+source "drivers/video/display/screen/Kconfig"
+source "drivers/video/display/transmitter/Kconfig"
+source "drivers/video/display/tve/Kconfig"
 
 endmenu
+

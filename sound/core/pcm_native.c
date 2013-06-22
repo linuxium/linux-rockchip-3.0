@@ -1040,6 +1040,17 @@ static int snd_pcm_pause(struct snd_pcm_substream *substream, int push)
 	return snd_pcm_action(&snd_pcm_action_pause, substream, push);
 }
 
+/*
+ * set volume.
+ * add by qiuen
+ */
+static int snd_pcm_vol(struct snd_pcm_substream *substream, int push)
+{
+	substream->number = push;
+
+	return substream->ops->trigger(substream, SNDRV_PCM_TRIGGER_VOLUME);
+}
+
 #ifdef CONFIG_PM
 /* suspend */
 
@@ -2559,6 +2570,11 @@ static int snd_pcm_common_ioctl1(struct file *file,
 		return snd_pcm_drain(substream, file);
 	case SNDRV_PCM_IOCTL_DROP:
 		return snd_pcm_drop(substream);
+	/*add by qiuen for volume*/	
+	case SNDRV_PCM_IOCTL_VOL:
+		snd_pcm_vol(substream, (int)(unsigned long)arg);
+		return 0;
+	/**********end***********/
 	case SNDRV_PCM_IOCTL_PAUSE:
 	{
 		int res;
@@ -2571,6 +2587,10 @@ static int snd_pcm_common_ioctl1(struct file *file,
 	snd_printd("unknown ioctl = 0x%x\n", cmd);
 	return -ENOTTY;
 }
+#ifdef	CONFIG_FB_WIMO
+int (*audio_data_to_wimo)(void* data,int size,int channel) = NULL;
+EXPORT_SYMBOL(audio_data_to_wimo);
+#endif
 
 static int snd_pcm_playback_ioctl1(struct file *file,
 				   struct snd_pcm_substream *substream,
@@ -2593,6 +2613,13 @@ static int snd_pcm_playback_ioctl1(struct file *file,
 			return -EFAULT;
 		if (copy_from_user(&xferi, _xferi, sizeof(xferi)))
 			return -EFAULT;
+		#ifdef	CONFIG_FB_WIMO
+		
+		if(audio_data_to_wimo!=NULL)
+		 	audio_data_to_wimo(xferi.buf, xferi.frames*4,2);
+		
+		#endif
+
 		result = snd_pcm_lib_write(substream, xferi.buf, xferi.frames);
 		__put_user(result, &_xferi->result);
 		return result < 0 ? result : 0;

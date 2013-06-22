@@ -26,6 +26,7 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_ALC5623 if I2C
 	select SND_SOC_CQ0093VC if MFD_DAVINCI_VOICECODEC
 	select SND_SOC_CS42L51 if I2C
+	select SND_SOC_CS42L52 if I2C
 	select SND_SOC_CS4270 if I2C
 	select SND_SOC_CS4271 if SND_SOC_I2C_AND_SPI
 	select SND_SOC_CX20442
@@ -49,6 +50,7 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_TLV320AIC3X if I2C
 	select SND_SOC_TPA6130A2 if I2C
 	select SND_SOC_TLV320DAC33 if I2C
+	select SND_SOC_TLV320AIC3111 if I2C
 	select SND_SOC_TWL4030 if TWL4030_CORE
 	select SND_SOC_TWL6040 if TWL4030_CORE
 	select SND_SOC_UDA134X
@@ -73,6 +75,13 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_WM8776 if SND_SOC_I2C_AND_SPI
 	select SND_SOC_WM8804 if SND_SOC_I2C_AND_SPI
 	select SND_SOC_WM8900 if I2C
+	select SND_SOC_RT5621 if I2C
+	select SND_SOC_RT5631 if I2C
+	select SND_SOC_RT5625 if I2C
+	select SND_SOC_RT3261 if I2C
+	select SND_SOC_RT3224 if I2C
+	select SND_SOC_RT5623 if I2C
+	select SND_SOC_RK610 if I2C
 	select SND_SOC_WM8903 if I2C
 	select SND_SOC_WM8904 if I2C
 	select SND_SOC_WM8915 if I2C
@@ -158,6 +167,9 @@ config SND_SOC_CQ0093VC
 config SND_SOC_CS42L51
 	tristate
 
+config SND_SOC_CS42L52
+	tristate
+
 # Cirrus Logic CS4270 Codec
 config SND_SOC_CS4270
 	tristate
@@ -235,6 +247,12 @@ config SND_SOC_TLV320AIC3X
 config SND_SOC_TLV320DAC33
 	tristate
 
+config SND_SOC_TLV320AIC3111
+	tristate
+
+config SND_SOC_TLV320AIC326X
+	tristate
+
 config SND_SOC_TWL4030
 	select TWL4030_CODEC
 	tristate
@@ -305,6 +323,24 @@ config SND_SOC_WM8804
 config SND_SOC_WM8900
 	tristate
 
+config SND_SOC_RT5621
+	tristate
+
+config SND_SOC_RT5623
+	tristate
+
+config SND_SOC_RT5631
+	tristate
+
+config SND_SOC_RT5625
+	tristate
+
+config SND_SOC_RT3224
+	tristate
+
+config SND_SOC_RT3261
+	tristate
+
 config SND_SOC_WM8903
 	tristate
 
@@ -371,6 +407,14 @@ config SND_SOC_WM9712
 config SND_SOC_WM9713
 	tristate
 
+config SND_SOC_RK1000
+	tristate
+#	depends on RK1000_CONTROL
+
+config SND_SOC_RK610
+	tristate
+	depends on MFD_RK610
+
 # Amp
 config SND_SOC_LM4857
 	tristate
@@ -386,3 +430,7 @@ config SND_SOC_WM2000
 
 config SND_SOC_WM9090
 	tristate
+
+config SND_SOC_RK2928
+	tristate
+	depends on ARCH_RK2928

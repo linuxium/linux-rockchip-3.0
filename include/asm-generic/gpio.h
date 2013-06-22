@@ -109,6 +109,9 @@ struct gpio_chip {
 	void			(*set)(struct gpio_chip *chip,
 						unsigned offset, int value);
 
+	int			(*pull_updown)(struct gpio_chip *chip,
+						unsigned offset, unsigned value);
+
 	int			(*to_irq)(struct gpio_chip *chip,
 						unsigned offset);
 
@@ -152,6 +155,8 @@ extern void gpio_free(unsigned gpio);
 
 extern int gpio_direction_input(unsigned gpio);
 extern int gpio_direction_output(unsigned gpio, int value);
+
+extern int gpio_pull_updown(unsigned gpio, unsigned value);
 
 extern int gpio_set_debounce(unsigned gpio, unsigned debounce);
 

@@ -44,6 +44,7 @@
 #include "fiq_debugger_ringbuf.h"
 
 #define DEBUG_MAX 64
+#define CMD_COUNT 0x0f
 #define MAX_UNHANDLED_FIQ_COUNT 1000000
 
 #define THREAD_INFO(sp) ((struct thread_info *) \
@@ -67,6 +68,10 @@ struct fiq_debugger_state {
 
 	char debug_buf[DEBUG_MAX];
 	int debug_count;
+
+	char cmd_buf[CMD_COUNT+1][DEBUG_MAX];
+	int back_pointer;
+	int current_pointer;
 
 	bool no_sleep;
 	bool debug_enable;
@@ -372,6 +377,7 @@ static void dump_irqs(struct fiq_debugger_state *state)
 		state->last_irqs[n] = kstat_irqs(n);
 	}
 
+#ifdef CONFIG_LOCAL_TIMERS
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {
 
 		debug_printf(state, "LOC %d: %10u %11u\n", cpu,
@@ -381,6 +387,7 @@ static void dump_irqs(struct fiq_debugger_state *state)
 		state->last_local_timer_irqs[cpu] =
 			__IRQ_STAT(cpu, local_timer_irqs);
 	}
+#endif
 }
 
 struct stacktrace_state {
@@ -541,13 +548,47 @@ static void do_sysrq(struct fiq_debugger_state *state, char rq)
 /* This function CANNOT be called in FIQ context */
 static void debug_irq_exec(struct fiq_debugger_state *state, char *cmd)
 {
+	int invalid_cmd = 0;
 	if (!strcmp(cmd, "ps"))
 		do_ps(state);
-	if (!strcmp(cmd, "sysrq"))
+	else if (!strcmp(cmd, "sysrq"))
 		do_sysrq(state, 'h');
-	if (!strncmp(cmd, "sysrq ", 6))
+	else if (!strncmp(cmd, "sysrq ", 6))
 		do_sysrq(state, cmd[6]);
+	else {
+		invalid_cmd = 1;
+		memset(state->debug_buf, 0, DEBUG_MAX);
+	}
+
+	if (invalid_cmd == 0) {
+		state->current_pointer = (state->current_pointer-1) & CMD_COUNT;
+		if (strcmp(state->cmd_buf[state->current_pointer], state->debug_buf)) {
+			state->current_pointer = (state->current_pointer+1) & CMD_COUNT;
+			memset(state->cmd_buf[state->current_pointer], 0, DEBUG_MAX);
+			strcpy(state->cmd_buf[state->current_pointer], state->debug_buf);
+		}
+		memset(state->debug_buf, 0, DEBUG_MAX);
+		state->current_pointer = (state->current_pointer+1) & CMD_COUNT;
+		state->back_pointer = state->current_pointer;
+	}
 }
+
+static char cmd_buf[][16] = {
+		{"pc"},
+		{"regs"},
+		{"allregs"},
+		{"bt"},
+		{"reboot"},
+		{"irqs"},
+		{"kmsg"},
+		{"version"},
+		{"sleep"},
+		{"nosleep"},
+		{"console"},
+		{"cpu"},
+		{"ps"},
+		{"sysrq"},
+};
 
 static void debug_help(struct fiq_debugger_state *state)
 {
@@ -585,6 +626,22 @@ static void switch_cpu(struct fiq_debugger_state *state, int cpu)
 {
 	if (!debug_have_fiq(state))
 		smp_call_function_single(cpu, take_affinity, state, false);
+#ifdef CONFIG_PLAT_RK
+	else {
+		struct cpumask cpumask;
+
+		if (!cpu_online(cpu)) {
+			debug_printf(state, "cpu %d offline\n", cpu);
+			return;
+		}
+
+		cpumask_clear(&cpumask);
+		cpumask_set_cpu(cpu, &cpumask);
+
+		irq_set_affinity(state->fiq, &cpumask);
+		irq_set_affinity(state->uart_irq, &cpumask);
+	}
+#endif
 	state->current_cpu = cpu;
 }
 
@@ -606,6 +663,8 @@ static bool debug_fiq_exec(struct fiq_debugger_state *state,
 		dump_stacktrace(state, (struct pt_regs *)regs, 100, svc_sp);
 	} else if (!strcmp(cmd, "reboot")) {
 		arch_reset(0, 0);
+	} else if (!strncmp(cmd, "reboot ", 7)) {
+		arch_reset(0, &cmd[7]);
 	} else if (!strcmp(cmd, "irqs")) {
 		dump_irqs(state);
 	} else if (!strcmp(cmd, "kmsg")) {
@@ -732,6 +791,109 @@ static int debug_getc(struct fiq_debugger_state *state)
 	return state->pdata->uart_getc(state->pdev);
 }
 
+
+static int debug_cmd_check_back(struct fiq_debugger_state *state, char c)
+{
+	char *s;
+	int i = 0;
+	if (c == 'A') {
+		state->back_pointer = (state->back_pointer-1) & CMD_COUNT;
+		if (state->back_pointer != state->current_pointer) {
+			s = state->cmd_buf[state->back_pointer];
+			if (*s != 0) {
+				for(i = 0; i < strlen(state->debug_buf)-1; i++) {
+					state->pdata->uart_putc(state->pdev, 8);
+					state->pdata->uart_putc(state->pdev, ' ');
+					state->pdata->uart_putc(state->pdev, 8);
+				}
+				memset(state->debug_buf, 0, DEBUG_MAX);
+				strcpy(state->debug_buf, s);
+				state->debug_count = strlen(state->debug_buf);
+				debug_printf(state, state->debug_buf);
+			} else {
+				state->back_pointer = (state->back_pointer+1) & CMD_COUNT;
+			}
+
+		} else {
+			state->back_pointer = (state->back_pointer+1) & CMD_COUNT;
+		}
+	} else if (c == 'B') {
+
+		if (state->back_pointer != state->current_pointer) {
+			state->back_pointer = (state->back_pointer+1) & CMD_COUNT;
+			if(state->back_pointer == state->current_pointer){
+				goto cmd_clear;
+			} else {
+				s = state->cmd_buf[state->back_pointer];
+				if (*s != 0) {
+					for(i = 0; i < strlen(state->debug_buf)-1; i++) {
+						state->pdata->uart_putc(state->pdev, 8);
+						state->pdata->uart_putc(state->pdev, ' ');
+						state->pdata->uart_putc(state->pdev, 8);
+					}
+					memset(state->debug_buf, 0, DEBUG_MAX);
+					strcpy(state->debug_buf, s);
+					state->debug_count = strlen(state->debug_buf);
+					debug_printf(state, state->debug_buf);
+				}
+			}
+		} else {
+cmd_clear:
+			for(i = 0; i < strlen(state->debug_buf)-1; i++) {
+				state->pdata->uart_putc(state->pdev, 8);
+				state->pdata->uart_putc(state->pdev, ' ');
+				state->pdata->uart_putc(state->pdev, 8);
+			}
+			memset(state->debug_buf, 0, DEBUG_MAX);
+			state->debug_count = 0;
+		}
+	}
+	return 0;
+}
+
+static void debug_cmd_tab(struct fiq_debugger_state *state)
+{
+	int i,j;
+	int count = 0;
+
+	for (i = 0; i < ARRAY_SIZE(cmd_buf); i++) {
+		cmd_buf[i][15] = 1;
+	}
+
+	for (j = 1; j <= strlen(state->debug_buf); j++) {
+		count = 0;
+		for (i = 0; i < ARRAY_SIZE(cmd_buf); i++) {
+			if (cmd_buf[i][15] == 1) {
+				if (strncmp(state->debug_buf, cmd_buf[i], j)) {
+					cmd_buf[i][15] = 0;
+				} else {
+					count++;
+				}
+			}
+		}
+		if (count == 0)
+			break;
+	}
+
+	if (count == 1) {
+		for (i = 0; i < ARRAY_SIZE(cmd_buf); i++) {
+			if (cmd_buf[i][15] == 1)
+				break;
+		}
+
+		for(j = 0; j < strlen(state->debug_buf); j++) {
+			state->pdata->uart_putc(state->pdev, 8);
+			state->pdata->uart_putc(state->pdev, ' ');
+			state->pdata->uart_putc(state->pdev, 8);
+		}
+		memset(state->debug_buf, 0, DEBUG_MAX);
+		strcpy(state->debug_buf, cmd_buf[i]);
+		state->debug_count = strlen(state->debug_buf);
+		debug_printf(state, state->debug_buf);
+
+	}
+}
+
 static bool debug_handle_uart_interrupt(struct fiq_debugger_state *state,
 			int this_cpu, void *regs, void *svc_sp)
 {
@@ -771,12 +933,26 @@ static bool debug_handle_uart_interrupt(struct fiq_debugger_state *state,
 			state->console_enable = false;
 			debug_puts(state, "fiq debugger mode\n");
 			state->debug_count = 0;
+			state->back_pointer = CMD_COUNT;
+			state->current_pointer = CMD_COUNT;
+			memset(state->cmd_buf, 0, (CMD_COUNT+1)*DEBUG_MAX);
 			debug_prompt(state);
 #ifdef CONFIG_FIQ_DEBUGGER_CONSOLE
 		} else if (state->console_enable && state->tty_rbuf) {
 			fiq_debugger_ringbuf_push(state->tty_rbuf, c);
 			signal_helper = true;
 #endif
+		} else if (last_c == '[' && (c == 'A' || c == 'B' || c == 'C' || c == 'D')) {
+			if (state->debug_count > 0) {
+				state->debug_count--;
+				state->pdata->uart_putc(state->pdev, 8);
+				state->pdata->uart_putc(state->pdev, ' ');
+				state->pdata->uart_putc(state->pdev, 8);
+			}
+			debug_cmd_check_back(state, c);
+			//tab
+		} else if (c == 9) {
+			debug_cmd_tab(state);
 		} else if ((c >= ' ') && (c < 127)) {
 			if (state->debug_count < (DEBUG_MAX - 1)) {
 				state->debug_buf[state->debug_count++] = c;
@@ -788,6 +964,7 @@ static bool debug_handle_uart_interrupt(struct fiq_debugger_state *state,
 				state->pdata->uart_putc(state->pdev, 8);
 				state->pdata->uart_putc(state->pdev, ' ');
 				state->pdata->uart_putc(state->pdev, 8);
+				state->debug_buf[state->debug_count] = 0;
 			}
 		} else if ((c == 13) || (c == 10)) {
 			if (c == '\r' || (c == '\n' && last_c != '\r')) {
@@ -800,6 +977,17 @@ static bool debug_handle_uart_interrupt(struct fiq_debugger_state *state,
 				signal_helper |=
 					debug_fiq_exec(state, state->debug_buf,
 						       regs, svc_sp);
+				if (signal_helper == false) {
+					state->current_pointer = (state->current_pointer-1) & CMD_COUNT;
+					if (strcmp(state->cmd_buf[state->current_pointer], state->debug_buf)) {
+						state->current_pointer = (state->current_pointer+1) & CMD_COUNT;
+						memset(state->cmd_buf[state->current_pointer], 0, DEBUG_MAX);
+						strcpy(state->cmd_buf[state->current_pointer], state->debug_buf);
+					}
+					memset(state->debug_buf, 0, DEBUG_MAX);
+					state->current_pointer = (state->current_pointer+1) & CMD_COUNT;
+					state->back_pointer = state->current_pointer;
+				}
 			} else {
 				debug_prompt(state);
 			}
@@ -897,6 +1085,13 @@ static void debug_console_write(struct console *co,
 
 	if (!state->console_enable && !state->syslog_dumping)
 		return;
+
+#ifdef CONFIG_RK_CONSOLE_THREAD
+	if (state->pdata->console_write) {
+		state->pdata->console_write(state->pdev, s, count);
+		return;
+	}
+#endif
 
 	debug_uart_enable(state);
 	while (count--) {

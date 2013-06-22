@@ -525,12 +525,34 @@ config APANIC_PLABEL
 	 If your platform uses a different flash partition label for storing
  	 crashdumps, enter it here.
 
+config MTK23D
+	bool "MTK6223D modem control driver"
+	default n	
+	
+config FM580X
+	bool "FM rda580x driver"
+
+config RK29_SC8800
+	bool "SC8800 misc driver"
+	default n
+
+config TDSC8800
+	bool "TDSC8800 modem control driver"
+	default n
+	
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
+source "drivers/misc/rk29_modem/Kconfig"
+source "drivers/misc/gps/Kconfig"
+source "drivers/misc/inv_mpu/Kconfig"
 source "drivers/misc/iwmc3200top/Kconfig"
 source "drivers/misc/ti-st/Kconfig"
 source "drivers/misc/lis3lv02d/Kconfig"
 source "drivers/misc/carma/Kconfig"
+source "drivers/misc/3g_module/Kconfig"
+source "drivers/misc/bp/Kconfig"
+source "drivers/misc/rk2928_callpad_misc/Kconfig"
 
 endif # MISC_DEVICES

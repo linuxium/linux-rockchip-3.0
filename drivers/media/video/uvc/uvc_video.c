@@ -740,9 +740,11 @@ static void uvc_video_encode_bulk(struct urb *urb, struct uvc_streaming *stream,
 
 	urb->transfer_buffer_length = stream->urb_size - len;
 }
-
-static void uvc_video_complete(struct urb *urb)
-{
+/* ddl@rock-chips.com : uvc_video_complete is run in_interrupt(), so uvc decode operation delay run in tasklet for
+*    usb host reenable interrupt soon
+*/
+static void uvc_video_complete_fun (struct urb *urb)
+{    
 	struct uvc_streaming *stream = urb->context;
 	struct uvc_video_queue *queue = &stream->queue;
 	struct uvc_buffer *buf = NULL;
@@ -779,6 +781,42 @@ static void uvc_video_complete(struct urb *urb)
 		uvc_printk(KERN_ERR, "Failed to resubmit video URB (%d).\n",
 			ret);
 	}
+}
+static void uvc_video_complete_tasklet(unsigned long data)
+{
+    struct urb *urb = (struct urb*)data;
+    struct uvc_streaming *stream = urb->context;
+    struct tasklet_struct *tasklet = NULL;
+    int i;
+    
+    uvc_video_complete_fun(urb);
+    for (i = 0; i < UVC_URBS; ++i) {    
+        if (stream->urb[i] == urb) {
+            tasklet = stream->tasklet[i];
+            break;
+        }
+    }
+    
+    return;
+}
+static void uvc_video_complete(struct urb *urb)
+{
+    int i;
+    struct uvc_streaming *stream = urb->context;
+    struct tasklet_struct *tasklet = NULL;
+    
+    for (i = 0; i < UVC_URBS; ++i) {    
+        if (stream->urb[i] == urb) {
+            tasklet = stream->tasklet[i];
+            break;
+        }
+    }
+
+    if (tasklet != NULL) {
+        tasklet_schedule(tasklet);
+    } else {
+        uvc_video_complete_fun(urb);
+    }
 }
 
 /*
@@ -860,15 +898,23 @@ static void uvc_uninit_video(struct uvc_streaming *stream, int free_buffers)
 {
 	struct urb *urb;
 	unsigned int i;
-
+   
 	for (i = 0; i < UVC_URBS; ++i) {
 		urb = stream->urb[i];
 		if (urb == NULL)
 			continue;
 
+        /* ddl@rock-chips.com: Tasklet must be kill before kill urb in uninit */
+        if (stream->tasklet[i]) {
+            tasklet_kill(stream->tasklet[i]);
+            kfree(stream->tasklet[i]);
+            stream->tasklet[i] = NULL;
+        }
+
 		usb_kill_urb(urb);
 		usb_free_urb(urb);
 		stream->urb[i] = NULL;
+        
 	}
 
 	if (free_buffers)
@@ -922,6 +968,14 @@ static int uvc_init_video_isoc(struct uvc_streaming *stream,
 		}
 
 		stream->urb[i] = urb;
+        /* ddl@rock-chips.com  */
+        stream->tasklet[i] = kmalloc(sizeof(struct tasklet_struct), GFP_KERNEL);
+        if (stream->tasklet[i] == NULL) {
+            uvc_printk(KERN_ERR, "device %s requested tasklet memory fail!\n",
+				stream->dev->name);
+        } else {
+            tasklet_init(stream->tasklet[i], uvc_video_complete_tasklet, (unsigned long)urb);
+        }
 	}
 
 	return 0;
@@ -973,6 +1027,15 @@ static int uvc_init_video_bulk(struct uvc_streaming *stream,
 		urb->transfer_dma = stream->urb_dma[i];
 
 		stream->urb[i] = urb;
+
+        /* ddl@rock-chips.com  */
+        stream->tasklet[i] = kmalloc(sizeof(struct tasklet_struct), GFP_KERNEL);
+        if (stream->tasklet[i] == NULL) {
+            uvc_printk(KERN_ERR, "device %s requested tasklet memory fail!\n",
+				stream->dev->name);
+        } else {
+            tasklet_init(stream->tasklet[i], uvc_video_complete_tasklet, (unsigned long)urb);
+        }
 	}
 
 	return 0;
@@ -1249,11 +1312,14 @@ int uvc_video_init(struct uvc_streaming *stream)
 int uvc_video_enable(struct uvc_streaming *stream, int enable)
 {
 	int ret;
-
+    
 	if (!enable) {
-		uvc_uninit_video(stream, 1);
-		usb_set_interface(stream->dev->udev, stream->intfnum, 0);
-		uvc_queue_enable(&stream->queue, 0);
+        if (stream->flags & UVC_QUEUE_STREAMING) {      /* ddl@rock-chips.com */
+            uvc_queue_enable(&stream->queue, 0);
+    		uvc_uninit_video(stream, 1);
+    		usb_set_interface(stream->dev->udev, stream->intfnum, 0);
+    		stream->flags &= ~UVC_QUEUE_STREAMING;
+        }
 		return 0;
 	}
 
@@ -1267,7 +1333,7 @@ int uvc_video_enable(struct uvc_streaming *stream, int enable)
 		uvc_queue_enable(&stream->queue, 0);
 		return ret;
 	}
-
+    stream->flags |= UVC_QUEUE_STREAMING;
 	return uvc_init_video(stream, GFP_KERNEL);
 }
 

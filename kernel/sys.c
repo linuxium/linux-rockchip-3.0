@@ -53,6 +53,18 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/unistd.h>
+/***************
+*	 DEBUG
+****************/
+#define RESTART_DEBUG
+#ifdef RESTART_DEBUG
+#define restart_dbg(format, arg...) \
+	printk("RESTART_DEBUG : " format "\n" , ## arg)
+#else
+#define restart_dbg(format, arg...) do {} while (0)
+#endif
+
+
 
 #ifndef SET_UNALIGN_CTL
 # define SET_UNALIGN_CTL(a,b)	(-EINVAL)
@@ -333,6 +345,11 @@ void kernel_restart_prepare(char *cmd)
  */
 void kernel_restart(char *cmd)
 {
+	/*
+	*  debug trace
+	*/
+	restart_dbg("%s->%d->cmd=%s",__FUNCTION__,__LINE__,cmd);
+	
 	kernel_restart_prepare(cmd);
 	disable_nonboot_cpus();
 	if (!cmd)
@@ -423,6 +440,11 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
 	mutex_lock(&reboot_mutex);
 	switch (cmd) {
 	case LINUX_REBOOT_CMD_RESTART:
+		/*
+		*  debug trace
+		*/
+		restart_dbg("%s->%d->cmd=%x",__FUNCTION__,__LINE__,cmd);
+		
 		kernel_restart(NULL);
 		break;
 
@@ -440,6 +462,11 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
 		panic("cannot halt");
 
 	case LINUX_REBOOT_CMD_POWER_OFF:
+		/*
+		*  debug trace
+		*/
+		restart_dbg("%s->%d->cmd=%x",__FUNCTION__,__LINE__,cmd);
+		
 		kernel_power_off();
 		do_exit(0);
 		break;
@@ -450,7 +477,11 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
 			break;
 		}
 		buffer[sizeof(buffer) - 1] = '\0';
-
+		/*
+		*  debug trace
+		*/
+		restart_dbg("%s->%d->cmd=%x args=%s",__FUNCTION__,__LINE__,cmd,buffer);
+		
 		kernel_restart(buffer);
 		break;
 
@@ -1133,16 +1164,15 @@ DECLARE_RWSEM(uts_sem);
  * Work around broken programs that cannot handle "Linux 3.0".
  * Instead we map 3.x to 2.6.40+x, so e.g. 3.0 would be 2.6.40
  */
-static int override_release(char __user *release, size_t len)
+static int override_release(char __user *release, int len)
 {
 	int ret = 0;
+	char buf[65];
 
 	if (current->personality & UNAME26) {
-		const char *rest = UTS_RELEASE;
-		char buf[65] = { 0 };
+		char *rest = UTS_RELEASE;
 		int ndots = 0;
 		unsigned v;
-		size_t copy;
 
 		while (*rest) {
 			if (*rest == '.' && ++ndots >= 3)
@@ -1152,9 +1182,8 @@ static int override_release(char __user *release, size_t len)
 			rest++;
 		}
 		v = ((LINUX_VERSION_CODE >> 8) & 0xff) + 40;
-		copy = clamp_t(size_t, len, 1, sizeof(buf));
-		copy = scnprintf(buf, copy, "2.6.%u%s", v, rest);
-		ret = copy_to_user(release, buf, copy + 1);
+		snprintf(buf, len, "2.6.%u%s", v, rest);
+		ret = copy_to_user(release, buf, len);
 	}
 	return ret;
 }

@@ -444,6 +444,7 @@ struct spi_transfer {
 	u8		bits_per_word;
 	u16		delay_usecs;
 	u32		speed_hz;
+	void			*state;
 
 	struct list_head transfer_list;
 };

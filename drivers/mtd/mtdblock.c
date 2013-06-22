@@ -28,6 +28,7 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/vmalloc.h>
+#include <linux/version.h>
 
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/blktrans.h>
@@ -139,8 +140,8 @@ static int write_cached_data (struct mtdblk_dev *mtdblk)
 	return 0;
 }
 
-
-static int do_cached_write (struct mtdblk_dev *mtdblk, unsigned long pos,
+#if 0
+static int do_cached_write (struct mtdblk_dev *mtdblk, loff_t pos,
 			    int len, const char *buf)
 {
 	struct mtd_info *mtd = mtdblk->mbd.mtd;
@@ -210,7 +211,7 @@ static int do_cached_write (struct mtdblk_dev *mtdblk, unsigned long pos,
 }
 
 
-static int do_cached_read (struct mtdblk_dev *mtdblk, unsigned long pos,
+static int do_cached_read (struct mtdblk_dev *mtdblk, loff_t pos,
 			   int len, char *buf)
 {
 	struct mtd_info *mtd = mtdblk->mbd.mtd;
@@ -257,14 +258,14 @@ static int do_cached_read (struct mtdblk_dev *mtdblk, unsigned long pos,
 }
 
 static int mtdblock_readsect(struct mtd_blktrans_dev *dev,
-			      unsigned long block, char *buf)
+			      loff_t block,unsigned long nsect, char *buf)
 {
 	struct mtdblk_dev *mtdblk = container_of(dev, struct mtdblk_dev, mbd);
-	return do_cached_read(mtdblk, block<<9, 512, buf);
+	return do_cached_read(mtdblk, (loff_t)block<<9, 512*nsect, buf);
 }
 
 static int mtdblock_writesect(struct mtd_blktrans_dev *dev,
-			      unsigned long block, char *buf)
+			      unsigned long block,unsigned long nsect, char *buf)
 {
 	struct mtdblk_dev *mtdblk = container_of(dev, struct mtdblk_dev, mbd);
 	if (unlikely(!mtdblk->cache_data && mtdblk->cache_size)) {
@@ -276,9 +277,45 @@ static int mtdblock_writesect(struct mtd_blktrans_dev *dev,
 		 * return -EAGAIN sometimes, but why bother?
 		 */
 	}
-	return do_cached_write(mtdblk, block<<9, 512, buf);
+	return do_cached_write(mtdblk, (loff_t)block<<9, 512*nsect, buf);
+}
+#else
+static int mtdblock_readsect(struct mtd_blktrans_dev *dev,
+			      unsigned long block,unsigned long nsect, char *buf)
+{
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35))
+	struct mtdblk_dev *mtdblk = container_of(dev, struct mtdblk_dev, mbd);
+	struct mtd_info *mtd = mtdblk->mbd.mtd;
+#else
+	struct mtdblk_dev *mtdblk = mtdblks[dev->devnum];
+	struct mtd_info *mtd = mtdblk->mtd;
+#endif
+	size_t retlen,len;
+	loff_t pos = (loff_t)block*512;
+    len = 512*nsect;
+
+	DEBUG(MTD_DEBUG_LEVEL2, "mtdblock: read on \"%s\" at 0x%llx, size 0x%x\n",mtd->name, pos, len);
+	return mtd->read(mtd, pos, len, &retlen, buf);
 }
 
+static int mtdblock_writesect(struct mtd_blktrans_dev *dev,
+			      unsigned long block,unsigned long nsect, char *buf)
+{
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35))
+	struct mtdblk_dev *mtdblk = container_of(dev, struct mtdblk_dev, mbd);
+	struct mtd_info *mtd = mtdblk->mbd.mtd;
+#else
+	struct mtdblk_dev *mtdblk = mtdblks[dev->devnum];
+	struct mtd_info *mtd = mtdblk->mtd;
+#endif
+	size_t retlen,len;
+	loff_t pos = (loff_t)block*512;
+    len = 512*nsect;
+    
+	DEBUG(MTD_DEBUG_LEVEL2, "mtdblock: write on \"%s\" at 0x%llx, size 0x%x\n",mtd->name, pos, len);
+    return mtd->write(mtd, pos, len, &retlen, buf);
+}
+#endif
 static int mtdblock_open(struct mtd_blktrans_dev *mbd)
 {
 	struct mtdblk_dev *mtdblk = container_of(mbd, struct mtdblk_dev, mbd);

@@ -107,11 +107,11 @@ int videobuf_waiton(struct videobuf_queue *q, struct videobuf_buffer *vb,
 	if (intr)
 		ret = wait_event_interruptible(vb->done, is_state_active_or_queued(q, vb));
 	else
-		wait_event(vb->done, is_state_active_or_queued(q, vb));
+		wait_event(vb->done, is_state_active_or_queued(q, vb));    
 	/* Relock */
 	if (is_ext_locked)
-		mutex_lock(q->ext_lock);
-
+		mutex_lock(q->ext_lock);    
+    
 	return ret;
 }
 EXPORT_SYMBOL_GPL(videobuf_waiton);
@@ -334,6 +334,7 @@ static void videobuf_status(struct videobuf_queue *q, struct v4l2_buffer *b,
 		break;
 	case V4L2_MEMORY_OVERLAY:
 		b->m.offset  = vb->boff;
+		b->length    = vb->bsize;
 		break;
 	}
 
@@ -641,6 +642,7 @@ EXPORT_SYMBOL_GPL(videobuf_qbuf);
 static int stream_next_buffer_check_queue(struct videobuf_queue *q, int noblock)
 {
 	int retval;
+    bool is_ext_locked;
 
 checks:
 	if (!q->streaming) {
@@ -657,16 +659,28 @@ checks:
 		} else {
 			dprintk(2, "next_buffer: waiting on buffer\n");
 
-			/* Drop lock to avoid deadlock with qbuf */
-			videobuf_queue_unlock(q);
+			/* Drop lock to avoid deadlock with qbuf */            
+            videobuf_queue_unlock(q);
+            /*ddl@rock-chips.com */
+            is_ext_locked = q->ext_lock && mutex_is_locked(q->ext_lock);
 
+        	/* Release vdev lock to prevent this wait from blocking outside access to
+        	   the device. */
+        	if (is_ext_locked)
+        		mutex_unlock(q->ext_lock);
+            
+            
 			/* Checking list_empty and streaming is safe without
 			 * locks because we goto checks to validate while
 			 * holding locks before proceeding */
 			retval = wait_event_interruptible(q->wait,
 				!list_empty(&q->stream) || !q->streaming);
-			videobuf_queue_lock(q);
 
+            videobuf_queue_lock(q);
+            /*ddl@rock-chips.com */
+            if (is_ext_locked)
+        		mutex_lock(q->ext_lock);
+            
 			if (retval)
 				goto done;
 
@@ -709,7 +723,7 @@ int videobuf_dqbuf(struct videobuf_queue *q,
 
 	MAGIC_CHECK(q->int_ops->magic, MAGIC_QTYPE_OPS);
 
-	memset(b, 0, sizeof(*b));
+	memset(b, 0, sizeof(*b));    
 	videobuf_queue_lock(q);
 
 	retval = stream_next_buffer(q, &buf, nonblocking);
