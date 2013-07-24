@@ -1,3 +1,6 @@
+/*$_FOR_ROCKCHIP_RBOX_$*/
+/*$_rbox_$_modify_$_huangzhibao for spdif output*/
+
 /*
  * ALSA SoC SPDIF DIT driver
  *

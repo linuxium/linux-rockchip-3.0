@@ -213,6 +213,11 @@ static void mmc_wait_done(struct mmc_request *mrq)
  */
 void mmc_wait_for_req(struct mmc_host *host, struct mmc_request *mrq)
 {
+#if defined(CONFIG_SDMMC_RK29) && !defined(CONFIG_SDMMC_RK29_OLD)
+	unsigned long datasize, waittime = 0xFFFF;
+	u32 multi, unit;
+#endif
+
 	DECLARE_COMPLETION_ONSTACK(complete);
 
 	mrq->done_data = &complete;
@@ -220,7 +225,51 @@ void mmc_wait_for_req(struct mmc_host *host, struct mmc_request *mrq)
 
 	mmc_start_request(host, mrq);
 
+#if defined(CONFIG_SDMMC_RK29) && !defined(CONFIG_SDMMC_RK29_OLD)
+    if( strncmp( mmc_hostname(host) ,"mmc0" , strlen("mmc0")) ) 
+    {
+        multi = (mrq->cmd->retries>0)?mrq->cmd->retries:1;
+        waittime = wait_for_completion_timeout(&complete,HZ*7*multi); //sdio; for cmd dead. Modifyed by xbw at 2011-06-02
+    }
+    else
+    {   
+        //calculate the timeout value for SDMMC; added by xbw at 2011-09-27
+        if(mrq->data)
+        {
+            unit = 2*(1<<20);// unit=2MB
+            datasize = mrq->data->blksz*mrq->data->blocks;
+            multi = datasize/unit;
+            multi += (datasize%unit)?1:0;
+            multi = (multi>0) ? multi : 1;
+            multi += (mrq->cmd->retries>0)?1:0;
+            waittime = wait_for_completion_timeout(&complete,HZ*7*multi); //It should be longer than bottom driver's time,due to the sum of two cmd time.
+                                                                          //modifyed by xbw at 2011-10-08
+                                                                          //
+                                                                          //example:
+                                                                          //rk29_sdmmc_request_end..2336...   CMD12 wait busy timeout!!!!! ====xbw=[sd_mmc]====
+                                                                          //mmc_wait_for_req..236.. !!!!! wait for CMD25 timeout ===xbw[mmc0]===
+        }
+        else
+        {
+            multi = (mrq->cmd->retries>0)?mrq->cmd->retries:1;
+            waittime = wait_for_completion_timeout(&complete,HZ*7*multi);
+        }
+    }
+    
+    if(waittime <= 1)
+    {
+        host->doneflag = 0;
+        mrq->cmd->error = -EIO;
+
+        if(0 == mrq->cmd->retries)
+        {
+            printk(KERN_WARNING "%s..%d.. !!!!! wait for CMD%d timeout [%s]\n",\
+                __FUNCTION__, __LINE__, mrq->cmd->opcode, mmc_hostname(host));
+        }
+    }
+#else
 	wait_for_completion(&complete);
+#endif
 }
 
 EXPORT_SYMBOL(mmc_wait_for_req);
@@ -1043,8 +1092,12 @@ static void mmc_power_up(struct mmc_host *host)
 	 * to reach the minimum voltage.
 	 */
 	mmc_delay(10);
-
+	
+#if defined(CONFIG_SDMMC_RK29) || !defined(CONFIG_SDMMC_RK29_OLD)   //Modifyed by xbw at 2011-11-17
+    host->ios.clock = host->f_min;
+#else
 	host->ios.clock = host->f_init;
+#endif
 
 	host->ios.power_mode = MMC_POWER_ON;
 	mmc_set_ios(host);
@@ -1590,6 +1643,10 @@ static int mmc_rescan_try_freq(struct mmc_host *host, unsigned freq)
 {
 	host->f_init = freq;
 
+#if defined(CONFIG_SDMMC_RK29) || !defined(CONFIG_SDMMC_RK29_OLD)   //Modifyed by xbw at 2011-11-17		
+	int init_ret=0;
+#endif
+
 #ifdef CONFIG_MMC_DEBUG
 	pr_info("%s: %s: trying to init card at %u Hz\n",
 		mmc_hostname(host), __func__, host->f_init);
@@ -1601,7 +1658,104 @@ static int mmc_rescan_try_freq(struct mmc_host *host, unsigned freq)
 	 * if the card is being re-initialized, just send it.  CMD52
 	 * should be ignored by SD/eMMC cards.
 	 */
-	sdio_reset(host);
+#if defined(CONFIG_SDMMC_RK29) || !defined(CONFIG_SDMMC_RK29_OLD)   //Modifyed by xbw at 2011-11-17	
+//the process is default for rockchip SDK. noted by xbw at 2011-11-17
+
+/* Order's important: probe SDIO, then SD, then MMC */
+
+#if !defined(CONFIG_USE_SDMMC0_FOR_WIFI_DEVELOP_BOARD)
+    if( strncmp( mmc_hostname(host) ,"mmc0" , strlen("mmc0")) )
+    {
+	    //sdio_reset(host);//make no sense; noteed by xbw at 2011-12-14
+    	mmc_go_idle(host);
+
+    	if (!(init_ret=mmc_attach_sdio(host)))
+    	{
+    	    printk(KERN_INFO "%s..%d..  ===== Initialize SDIO successfully. [%s]\n",\
+    	        __FUNCTION__,  __LINE__, mmc_hostname(host));
+    		return 0;
+    	}
+    	else
+    	{
+    	    if(0xFF!=init_ret)
+    	    {
+    	         printk(KERN_WARNING "\n=====\n %s..%d..  ===== Initialize SDIO-card unsuccessfully!!! [%s]\n=====\n",\
+    		        __FUNCTION__,  __LINE__, mmc_hostname(host));
+
+    		     goto freq_out;   
+    	    }
+    	}
+    }
+    else
+    {
+        mmc_go_idle(host);
+    }
+#else
+    //sdio_reset(host); //make no sense; noteed by xbw at 2011-12-14
+	mmc_go_idle(host);
+
+	if (!(init_ret=mmc_attach_sdio(host)))
+	{
+	    printk(KERN_INFO "%s..%d..  ===== Initialize SDIO successfully. [%s]\n",\
+	        __FUNCTION__,  __LINE__, mmc_hostname(host));
+		return 0;
+	}
+	else
+	{
+	    if(0xFF!=init_ret)
+	    {
+	         printk(KERN_WARNING "\n=====\n %s..%d..  ===== Initialize SDIO-card unsuccessfully!!! [%s]\n=====\n",\
+		        __FUNCTION__,  __LINE__, mmc_hostname(host));
+
+		     goto freq_out;   
+	    }
+	}
+#endif // #end--#if !defined(CONFIG_USE_SDMMC0_FOR_WIFI_DEVELOP_BOARD)
+
+    if (!(init_ret=mmc_attach_sd(host)))
+    {
+        printk(KERN_INFO "%s..%d..  ===== Initialize SD-card successfully. [%s]\n",\
+            __FUNCTION__,  __LINE__, mmc_hostname(host));
+            
+	    return 0;
+	}
+	else
+	{
+	    if(0xFF!=init_ret)
+	    {
+	          printk(KERN_WARNING "\n=====\n%s..%d..  ===== Initialize SD-card unsuccessfully! [%s]\n====\n",\
+	                __FUNCTION__,  __LINE__, mmc_hostname(host));
+
+		     goto freq_out;   
+	    }
+	}
+
+
+	if (!(init_ret=mmc_attach_mmc(host)))
+	{
+	    printk(KERN_INFO "%s...%d..  ===== Initialize MMC-card successfully. [%s]\n",\
+	        __FUNCTION__,  __LINE__, mmc_hostname(host));
+
+	    return 0;
+	}
+	else
+	{
+	    if(0xFF!=init_ret)
+	    {
+	         printk(KERN_WARNING "\n =====\n%s..%d..  ===== Initialize MMC-card unsuccessfully!!! [%s]\n======\n",\
+	            __FUNCTION__,  __LINE__, mmc_hostname(host));
+	            
+		     goto freq_out;   
+	    }
+	}		
+    	
+freq_out:
+	mmc_power_off(host);
+	return -EIO;
+
+#else  // the default process in ICS.
+
+    sdio_reset(host);
 	mmc_go_idle(host);
 
 	mmc_send_if_cond(host, host->ocr_avail);
@@ -1616,6 +1770,8 @@ static int mmc_rescan_try_freq(struct mmc_host *host, unsigned freq)
 
 	mmc_power_off(host);
 	return -EIO;
+#endif 
+
 }
 
 void mmc_rescan(struct work_struct *work)
@@ -1664,10 +1820,27 @@ void mmc_rescan(struct work_struct *work)
 	 */
 	mmc_bus_put(host);
 
+#if defined(CONFIG_SDMMC_RK29) || !defined(CONFIG_SDMMC_RK29_OLD)   //Modifyed by xbw at 2011-11-17
+    printk(KERN_INFO "\n%s...%d..  ===== mmc_rescan Begin....[%s]\n",__FILE__, __LINE__, mmc_hostname(host));
+#endif
+
 	if (host->ops->get_cd && host->ops->get_cd(host) == 0)
+	{
+#if defined(CONFIG_SDMMC_RK29) || !defined(CONFIG_SDMMC_RK29_OLD)   //Modifyed by xbw at 2011-11-17
+    	 printk(KERN_WARNING "\n=================\n%s..%d..  ====find no SDMMC host. [%s]\n", \
+    	        __FUNCTION__, __LINE__, mmc_hostname(host));
+#endif
+
 		goto out;
+	}
 
 	mmc_claim_host(host);
+
+#if defined(CONFIG_SDMMC_RK29) || !defined(CONFIG_SDMMC_RK29_OLD)   //Modifyed by xbw at 2011-11-17
+    if (!mmc_rescan_try_freq(host, host->f_min)) 
+        extend_wakelock = true;
+
+#else	
 	for (i = 0; i < ARRAY_SIZE(freqs); i++) {
 		if (!mmc_rescan_try_freq(host, max(freqs[i], host->f_min))) {
 			extend_wakelock = true;
@@ -1676,6 +1849,8 @@ void mmc_rescan(struct work_struct *work)
 		if (freqs[i] <= host->f_min)
 			break;
 	}
+#endif
+
 	mmc_release_host(host);
 
  out:
@@ -1837,6 +2012,10 @@ int mmc_suspend_host(struct mmc_host *host)
 	if (host->bus_ops && !host->bus_dead) {
 		if (host->bus_ops->suspend)
 			err = host->bus_ops->suspend(host);
+
+#if defined(CONFIG_SDMMC_RK29) && !defined(CONFIG_SDMMC_RK29_OLD)
+               //deleted all detail code. //fix the crash bug when error occur during suspend. Modiefyed by xbw at 2012-08-09
+#else
 		if (err == -ENOSYS || !host->bus_ops->resume) {
 			/*
 			 * We simply "remove" the card in this case.
@@ -1851,6 +2030,7 @@ int mmc_suspend_host(struct mmc_host *host)
 			host->pm_flags = 0;
 			err = 0;
 		}
+#endif
 		flush_delayed_work(&host->disable);
 	}
 	mmc_bus_put(host);
@@ -1896,6 +2076,11 @@ int mmc_resume_host(struct mmc_host *host)
 			}
 		}
 		BUG_ON(!host->bus_ops->resume);
+#if defined(CONFIG_SDMMC_RK29) && !defined(CONFIG_SDMMC_RK29_OLD)
+        //panic if the card is being removed during the resume, deleted by xbw at 2011-06-20
+		host->bus_ops->resume(host);
+
+#else
 		err = host->bus_ops->resume(host);
 		if (err) {
 			printk(KERN_WARNING "%s: error %d during resume "
@@ -1903,6 +2088,7 @@ int mmc_resume_host(struct mmc_host *host)
 					    mmc_hostname(host), err);
 			err = 0;
 		}
+#endif
 	}
 	host->pm_flags &= ~MMC_PM_KEEP_POWER;
 	mmc_bus_put(host);

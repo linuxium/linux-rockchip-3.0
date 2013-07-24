@@ -351,8 +351,13 @@ static int mmc_sdio_init_card(struct mmc_host *host, u32 ocr,
 	 */
 	if (!powered_resume) {
 		err = mmc_send_io_op_cond(host, host->ocr, &ocr);
-		if (err)
+		if (err) {
+#if defined(CONFIG_SDMMC_RK29) && !defined(CONFIG_SDMMC_RK29_OLD)
+	    printk(KERN_ERR "%s..%d..  ====*Identify the card as SDIO , but OCR error, so fail to initialize. [%s]\n", \
+	        __FUNCTION__, __LINE__, mmc_hostname(host));
+#endif
 			goto err;
+		}
 	}
 
 	/*
@@ -787,9 +792,17 @@ int mmc_attach_sdio(struct mmc_host *host)
 	WARN_ON(!host->claimed);
 
 	err = mmc_send_io_op_cond(host, 0, &ocr);
+	
+#if defined(CONFIG_SDMMC_RK29) && !defined(CONFIG_SDMMC_RK29_OLD)	
 	if (err)
+		return 0xFF;//return err; //Modifyed by xbw at 2011-11-17
+		
+    printk(KERN_INFO "\n%s..%d..  ===== Begin to identify card as SDIO-card. [%s]\n",\
+        __FUNCTION__, __LINE__, mmc_hostname(host));
+#else
+    if (err)
 		return err;
-
+#endif        
 	mmc_attach_bus(host, &mmc_sdio_ops);
 	if (host->ocr_avail_sdio)
 		host->ocr_avail = host->ocr_avail_sdio;
@@ -932,6 +945,11 @@ int sdio_reset_comm(struct mmc_card *card)
 
 	printk("%s():\n", __func__);
 	mmc_claim_host(host);
+
+#if defined(CONFIG_SDMMC_RK29) && !defined(CONFIG_SDMMC_RK29_OLD)
+	host->sdmmc_host_hw_init(mmc_priv(host));  //added by xbw , at 2011-10-18
+	host->ios.clock = host->f_min; //for avoid 25MHz once again during init process.noted by xbw at 2011-11-14
+#endif
 
 	mmc_go_idle(host);
 

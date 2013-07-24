@@ -49,6 +49,9 @@
 
 #define DRIVER_VERSION		"22-Aug-2005"
 
+static char version[] =
+KERN_INFO "USBNET Framwork for ASIX USB Ethernet Adapter:3.2.101 Beta6"
+	" " __TIME__ " " __DATE__ "\n";
 
 /*-------------------------------------------------------------------------*/
 
@@ -245,7 +248,7 @@ void usbnet_skb_return (struct usbnet *dev, struct sk_buff *skb)
 }
 EXPORT_SYMBOL_GPL(usbnet_skb_return);
 
-
+
 /*-------------------------------------------------------------------------
  *
  * Network Device Driver (peer link to "Host Device", from USB host)
@@ -346,7 +349,7 @@ static int rx_submit (struct usbnet *dev, struct urb *urb, gfp_t flags)
 		usb_free_urb (urb);
 		return -ENOMEM;
 	}
-	skb_reserve (skb, NET_IP_ALIGN);
+	//skb_reserve (skb, NET_IP_ALIGN);  //ylz++
 
 	entry = (struct skb_data *) skb->cb;
 	entry->urb = urb;
@@ -1408,6 +1411,8 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	net->netdev_ops = &usbnet_netdev_ops;
 	net->watchdog_timeo = TX_TIMEOUT_JIFFIES;
 	net->ethtool_ops = &usbnet_ethtool_ops;
+
+	info->flags |= FLAG_AVOID_UNLINK_URBS;
 
 	// allow device-specific bind/init procedures
 	// NOTE net->name still not usable ...

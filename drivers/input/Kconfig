@@ -1,3 +1,5 @@
+##$_FOR_ROCKCHIP_RBOX_$
+
 #
 # Input device configuration
 #
@@ -182,7 +184,26 @@ source "drivers/input/tablet/Kconfig"
 
 source "drivers/input/touchscreen/Kconfig"
 
+source "drivers/input/ts/Kconfig"
+
 source "drivers/input/misc/Kconfig"
+
+source "drivers/input/magnetometer/Kconfig"
+
+source "drivers/input/gsensor/Kconfig"
+
+source "drivers/input/gyroscope/Kconfig"
+
+source "drivers/input/jogball/Kconfig"
+
+source "drivers/input/lightsensor/Kconfig"
+
+source "drivers/input/sensors/Kconfig"
+
+#$_rbox_$_modify_$_huangzhibao_20120508: add remotectl
+#$_rbox_$_modify_$_begin
+source "drivers/input/remotectl/Kconfig"
+#$_rbox_$_modify_$_end
 
 endif
 

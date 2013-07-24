@@ -65,8 +65,8 @@ MODULE_VERSION("1.0");
 static const char longname[] = "Gadget Android";
 
 /* Default vendor and product IDs, overridden by userspace */
-#define VENDOR_ID		0x18D1
-#define PRODUCT_ID		0x0001
+#define VENDOR_ID		0x2207//0x18D1
+#define PRODUCT_ID		0x2910
 
 struct android_usb_function {
 	char *name;
@@ -636,8 +636,9 @@ static int mass_storage_function_init(struct android_usb_function *f,
 	if (!config)
 		return -ENOMEM;
 
-	config->fsg.nluns = 1;
+	config->fsg.nluns = 2;
 	config->fsg.luns[0].removable = 1;
+	config->fsg.luns[1].removable = 1;
 
 	common = fsg_common_init(NULL, cdev, &config->fsg);
 	if (IS_ERR(common)) {
@@ -648,6 +649,7 @@ static int mass_storage_function_init(struct android_usb_function *f,
 	err = sysfs_create_link(&f->dev->kobj,
 				&common->luns[0].dev.kobj,
 				"lun");
+        err = sysfs_create_link(&f->dev->kobj, &common->luns[1].dev.kobj,"lun1");
 	if (err) {
 		kfree(config);
 		return err;
@@ -686,8 +688,11 @@ static ssize_t mass_storage_inquiry_store(struct device *dev,
 	struct mass_storage_function_config *config = f->config;
 	if (size >= sizeof(config->common->inquiry_string))
 		return -EINVAL;
-	if (sscanf(buf, "%s", config->common->inquiry_string) != 1)
-		return -EINVAL;
+	//if (sscanf(buf, "%s", config->common->inquiry_string) != 1)
+	//	return -EINVAL;
+	
+	memcpy(config->common->inquiry_string,buf,sizeof config->common->inquiry_string);
+
 	return size;
 }
 

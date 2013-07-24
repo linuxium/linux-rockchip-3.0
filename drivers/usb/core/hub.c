@@ -1286,7 +1286,7 @@ static void hub_disconnect(struct usb_interface *intf)
 
 	kref_put(&hub->kref, hub_release);
 }
-
+struct usb_hub *g_root_hub20 = NULL;
 static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_host_interface *desc;
@@ -1346,7 +1346,10 @@ descriptor_error:
 		dev_dbg (&intf->dev, "couldn't kmalloc hub struct\n");
 		return -ENOMEM;
 	}
-
+	if(!g_root_hub20)
+	{
+		g_root_hub20 = hub;
+	}
 	kref_init(&hub->kref);
 	INIT_LIST_HEAD(&hub->event_list);
 	hub->intfdev = &intf->dev;
@@ -1914,7 +1917,11 @@ int usb_new_device(struct usb_device *udev)
 		add_device_randomness(udev->manufacturer,
 				      strlen(udev->manufacturer));
 
-	device_enable_async_suspend(&udev->dev);
+	/* kever@rk 20111205
+	 * We don't use async suspend in rk29 usb
+	 * to make sure usb1.1 host is suspend before usb 2.0 host.
+	 */
+	//device_enable_async_suspend(&udev->dev);
 	/* Register the device.  The device driver is responsible
 	 * for configuring the device and invoking the add-device
 	 * notifier chain (used by usbfs and possibly others).
@@ -2050,7 +2057,7 @@ static unsigned hub_is_wusb(struct usb_hub *hub)
 #define HUB_ROOT_RESET_TIME	50	/* times are in msec */
 #define HUB_SHORT_RESET_TIME	10
 #define HUB_LONG_RESET_TIME	200
-#define HUB_RESET_TIMEOUT	500
+#define HUB_RESET_TIMEOUT	800
 
 static int hub_port_wait_reset(struct usb_hub *hub, int port1,
 				struct usb_device *udev, unsigned int delay)
@@ -2413,7 +2420,7 @@ int usb_port_suspend(struct usb_device *udev, pm_message_t msg)
 static int finish_port_resume(struct usb_device *udev)
 {
 	int	status = 0;
-	u16	devstatus;
+	u16	devstatus = 0;
 
 	/* caller owns the udev device lock */
 	dev_dbg(&udev->dev, "%s\n",
@@ -2458,7 +2465,13 @@ static int finish_port_resume(struct usb_device *udev)
 	if (status) {
 		dev_dbg(&udev->dev, "gone after usb resume? status %d\n",
 				status);
-	} else if (udev->actconfig) {
+	/*
+	 * There are a few quirky devices which violate the standard
+	 * by claiming to have remote wakeup enabled after a reset,
+	 * which crash if the feature is cleared, hence check for
+	 * udev->reset_resume
+	 */
+	} else if (udev->actconfig && !udev->reset_resume) {
 		le16_to_cpus(&devstatus);
 		if (devstatus & (1 << USB_DEVICE_REMOTE_WAKEUP)) {
 			status = usb_control_msg(udev,
@@ -2904,11 +2917,17 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 		udev->ttport = hdev->ttport;
 	} else if (udev->speed != USB_SPEED_HIGH
 			&& hdev->speed == USB_SPEED_HIGH) {
+			
+	/* yk@rk 20110617
+	 * parent hub has no TT would not be error in rk29
+	 */
+		#if 0
 		if (!hub->tt.hub) {
 			dev_err(&udev->dev, "parent hub has no TT\n");
 			retval = -EINVAL;
 			goto fail;
 		}
+		#endif
 		udev->tt = &hub->tt;
 		udev->ttport = port1;
 	}
@@ -3640,6 +3659,14 @@ static void hub_events(void)
 		kref_put(&hub->kref, hub_release);
 
         } /* end while (1) */
+}
+
+/* yk@rk 20100730 
+ * disconnect all devices on root hub
+ */
+void hub_disconnect_device(struct usb_hub *hub)
+{
+    	hub_port_connect_change(hub, 1, 0, 0x2);
 }
 
 static int hub_thread(void *__unused)

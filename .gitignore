@@ -32,6 +32,7 @@ modules.builtin
 *.lzo
 *.patch
 *.gcno
+Untitled Project.*
 
 #
 # Top-level generic files
@@ -44,13 +45,14 @@ modules.builtin
 /System.map
 /Module.markers
 /Module.symvers
+/kernel.img
 
 #
 # git files that we don't want to ignore even it they are dot-files
 #
 !.gitignore
 !.mailmap
-
+!.config
 #
 # Generated include files
 #

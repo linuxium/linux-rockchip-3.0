@@ -300,6 +300,10 @@ static void cpufreq_interactive_timer(unsigned long data)
 	cpu_load = loadadjfreq / pcpu->target_freq;
 	boosted = boost_val || now < boostpulse_endtime;
 
+#ifdef CONFIG_PLAT_RK
+	pcpu->target_freq = pcpu->policy->cur;
+#endif
+
 	if (cpu_load >= go_hispeed_load || boosted) {
 		if (pcpu->target_freq < hispeed_freq) {
 			new_freq = hispeed_freq;
@@ -919,7 +923,18 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		freq_table =
 			cpufreq_frequency_get_table(policy->cpu);
 		if (!hispeed_freq)
+#ifdef CONFIG_PLAT_RK
+		{
+			unsigned int index;
 			hispeed_freq = policy->max;
+			if (policy->min < 816000)
+				hispeed_freq = 816000;
+			else if (cpufreq_frequency_table_target(policy, freq_table, policy->min + 1, CPUFREQ_RELATION_L, &index) == 0)
+				hispeed_freq = freq_table[index].frequency;
+		}
+#else
+			hispeed_freq = policy->max;
+#endif
 
 		for_each_cpu(j, policy->cpus) {
 			unsigned long expires;

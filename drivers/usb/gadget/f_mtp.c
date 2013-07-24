@@ -82,8 +82,9 @@ struct mtp_dev {
 
 	/* synchronize access to our device file */
 	atomic_t open_excl;
-	/* to enforce only one ioctl at a time */
-	atomic_t ioctl_excl;
+
+	atomic_t ioctl_opt_excl;   /* lock for operation */
+	atomic_t ioctl_event_excl; /* lock for event */
 
 	struct list_head tx_idle;
 	struct list_head intr_idle;
@@ -348,8 +349,7 @@ static struct usb_request
 static void mtp_complete_in(struct usb_ep *ep, struct usb_request *req)
 {
 	struct mtp_dev *dev = _mtp_dev;
-
-	if (req->status != 0)
+	if ((req->status != 0) && (dev->state != STATE_CANCELED))
 		dev->state = STATE_ERROR;
 
 	mtp_req_put(dev, &dev->tx_idle, req);
@@ -362,7 +362,7 @@ static void mtp_complete_out(struct usb_ep *ep, struct usb_request *req)
 	struct mtp_dev *dev = _mtp_dev;
 
 	dev->rx_done = 1;
-	if (req->status != 0)
+	if ((req->status != 0) && (dev->state != STATE_CANCELED))
 		dev->state = STATE_ERROR;
 
 	wake_up(&dev->read_wq);
@@ -400,15 +400,6 @@ static int mtp_create_bulk_endpoints(struct mtp_dev *dev,
 	DBG(cdev, "usb_ep_autoconfig for ep_in got %s\n", ep->name);
 	ep->driver_data = dev;		/* claim the endpoint */
 	dev->ep_in = ep;
-
-	ep = usb_ep_autoconfig(cdev->gadget, out_desc);
-	if (!ep) {
-		DBG(cdev, "usb_ep_autoconfig for ep_out failed\n");
-		return -ENODEV;
-	}
-	DBG(cdev, "usb_ep_autoconfig for mtp ep_out got %s\n", ep->name);
-	ep->driver_data = dev;		/* claim the endpoint */
-	dev->ep_out = ep;
 
 	ep = usb_ep_autoconfig(cdev->gadget, out_desc);
 	if (!ep) {
@@ -470,7 +461,7 @@ static ssize_t mtp_read(struct file *fp, char __user *buf,
 	DBG(cdev, "mtp_read(%d)\n", count);
 
 	if (count > MTP_BULK_BUFFER_SIZE)
-		return -EINVAL;
+        count = MTP_BULK_BUFFER_SIZE;
 
 	/* we will block until we're online */
 	DBG(cdev, "mtp_read: waiting for online state\n");
@@ -504,7 +495,14 @@ requeue_req:
 	}
 
 	/* wait for a request to complete */
-	ret = wait_event_interruptible(dev->read_wq, dev->rx_done);
+	ret = wait_event_interruptible(dev->read_wq, 
+	        dev->rx_done|| (dev->state != STATE_BUSY));
+	if (dev->state == STATE_CANCELED) {
+		r = -ECANCELED;
+		if (!dev->rx_done)
+			usb_ep_dequeue(dev->ep_out, req);
+		goto done;
+	}
 	if (ret < 0) {
 		r = ret;
 		usb_ep_dequeue(dev->ep_out, req);
@@ -671,7 +669,7 @@ static void send_file_work(struct work_struct *data) {
 		req = 0;
 		ret = wait_event_interruptible(dev->write_wq,
 			(req = mtp_req_get(dev, &dev->tx_idle))
-			|| dev->state != STATE_BUSY);
+			|| (dev->state != STATE_BUSY));
 		if (dev->state == STATE_CANCELED) {
 			r = -ECANCELED;
 			break;
@@ -744,7 +742,9 @@ static void receive_file_work(struct work_struct *data)
 	filp = dev->xfer_file;
 	offset = dev->xfer_file_offset;
 	count = dev->xfer_file_length;
-
+	/* yk@20120509 read zero length packet */
+    if(( count&0x1ff) == 0)
+    	count ++;
 	DBG(cdev, "receive_file_work(%lld)\n", count);
 
 	while (count > 0 || write_req) {
@@ -780,7 +780,7 @@ static void receive_file_work(struct work_struct *data)
 		if (read_req) {
 			/* wait for our last read to complete */
 			ret = wait_event_interruptible(dev->read_wq,
-				dev->rx_done || dev->state != STATE_BUSY);
+				dev->rx_done || (dev->state != STATE_BUSY));
 			if (dev->state == STATE_CANCELED) {
 				r = -ECANCELED;
 				if (!dev->rx_done)
@@ -796,6 +796,10 @@ static void receive_file_work(struct work_struct *data)
 				/* short packet is used to signal EOF for sizes > 4 gig */
 				DBG(cdev, "got short packet\n");
 				count = 0;
+				/* yk@20120509 usb disconnect will couse short packet, 
+				 * and dev state change to STATE_OFFLINE */
+                if(dev->state != STATE_BUSY)
+                    r = -EIO;
 			}
 
 			write_req = read_req;
@@ -845,13 +849,13 @@ static long mtp_ioctl(struct file *fp, unsigned code, unsigned long value)
 	struct file *filp = NULL;
 	int ret = -EINVAL;
 
-	if (mtp_lock(&dev->ioctl_excl))
-		return -EBUSY;
 
 	switch (code) {
 	case MTP_SEND_FILE:
 	case MTP_RECEIVE_FILE:
-	case MTP_SEND_FILE_WITH_HEADER:
+    case MTP_SEND_FILE_WITH_HEADER:
+        if (mtp_lock(&dev->ioctl_opt_excl))
+            return -EBUSY;
 	{
 		struct mtp_file_range	mfr;
 		struct work_struct *work;
@@ -918,6 +922,10 @@ static long mtp_ioctl(struct file *fp, unsigned code, unsigned long value)
 	case MTP_SEND_EVENT:
 	{
 		struct mtp_event	event;
+
+        if (mtp_lock(&dev->ioctl_event_excl))
+            return -EBUSY;
+
 		/* return here so we don't change dev->state below,
 		 * which would interfere with bulk transfer state.
 		 */
@@ -937,7 +945,11 @@ fail:
 		dev->state = STATE_READY;
 	spin_unlock_irq(&dev->lock);
 out:
-	mtp_unlock(&dev->ioctl_excl);
+    if (MTP_SEND_EVENT == code)
+        mtp_unlock(&dev->ioctl_event_excl);
+    else
+        mtp_unlock(&dev->ioctl_opt_excl);
+
 	DBG(dev->cdev, "ioctl returning %d\n", ret);
 	return ret;
 }
@@ -1022,10 +1034,10 @@ static int mtp_ctrlrequest(struct usb_composite_dev *cdev,
 
 		if (ctrl->bRequest == MTP_REQ_CANCEL && w_index == 0
 				&& w_value == 0) {
-			DBG(cdev, "MTP_REQ_CANCEL\n");
+			DBG(cdev, "MTP_REQ_CANCEL %d\n", dev->state);
 
 			spin_lock_irqsave(&dev->lock, flags);
-			if (dev->state == STATE_BUSY) {
+			/*if (dev->state == STATE_BUSY)*/ {
 				dev->state = STATE_CANCELED;
 				wake_up(&dev->read_wq);
 				wake_up(&dev->write_wq);
@@ -1043,7 +1055,7 @@ static int mtp_ctrlrequest(struct usb_composite_dev *cdev,
 			status->wLength =
 				__constant_cpu_to_le16(sizeof(*status));
 
-			DBG(cdev, "MTP_REQ_GET_DEVICE_STATUS\n");
+			DBG(cdev, "MTP_REQ_GET_DEVICE_STATUS %d\n", dev->state);
 			spin_lock_irqsave(&dev->lock, flags);
 			/* device status is "busy" until we report
 			 * the cancelation to userspace
@@ -1153,6 +1165,8 @@ static int mtp_function_set_alt(struct usb_function *f,
 		return ret;
 	}
 	dev->state = STATE_READY;
+	
+	atomic_set(&dev->open_excl, 0); // solve open_excl lock problem, add by Huweiguo
 
 	/* readers may be blocked waiting for us to go online */
 	wake_up(&dev->read_wq);
@@ -1167,8 +1181,11 @@ static void mtp_function_disable(struct usb_function *f)
 	DBG(cdev, "mtp_function_disable\n");
 	dev->state = STATE_OFFLINE;
 	usb_ep_disable(dev->ep_in);
+	dev->ep_in->driver_data = NULL;
 	usb_ep_disable(dev->ep_out);
+	dev->ep_out->driver_data = NULL;
 	usb_ep_disable(dev->ep_intr);
+	dev->ep_intr->driver_data = NULL;
 
 	/* readers may be blocked waiting for us to go online */
 	wake_up(&dev->read_wq);
@@ -1224,7 +1241,8 @@ static int mtp_setup(void)
 	init_waitqueue_head(&dev->write_wq);
 	init_waitqueue_head(&dev->intr_wq);
 	atomic_set(&dev->open_excl, 0);
-	atomic_set(&dev->ioctl_excl, 0);
+	atomic_set(&dev->ioctl_opt_excl, 0);
+	atomic_set(&dev->ioctl_event_excl, 0);
 	INIT_LIST_HEAD(&dev->tx_idle);
 	INIT_LIST_HEAD(&dev->intr_idle);
 

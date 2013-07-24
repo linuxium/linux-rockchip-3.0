@@ -435,8 +435,11 @@ struct uvc_video_queue {
 	struct mutex mutex;	/* protects buffers and mainqueue */
 	spinlock_t irqlock;	/* protects irqqueue */
 
+    wait_queue_head_t wait; /* wait if mainqueue is empty */
+
 	struct list_head mainqueue;
 	struct list_head irqqueue;
+    
 };
 
 struct uvc_video_chain {
@@ -496,6 +499,9 @@ struct uvc_streaming {
 
 	__u32 sequence;
 	__u8 last_fid;
+
+    struct tasklet_struct *tasklet[UVC_URBS];     /* ddl@rock-chips.com */
+    unsigned int flags;
 };
 
 enum uvc_device_state {

@@ -1,3 +1,4 @@
+#$_FOR_ROCKCHIP_RBOX_$
 # Makefile for staging directory
 
 # fix for build system bug...
@@ -43,6 +44,8 @@ obj-$(CONFIG_VME_BUS)		+= vme/
 obj-$(CONFIG_DX_SEP)            += sep/
 obj-$(CONFIG_IIO)		+= iio/
 obj-$(CONFIG_CS5535_GPIO)	+= cs5535_gpio/
+#obj-$(CONFIG_VIVANTE)		+= rk29/vivante/
+obj-y            		+= rk29/ipp/
 obj-$(CONFIG_ZRAM)		+= zram/
 obj-$(CONFIG_XVMALLOC)		+= zram/
 obj-$(CONFIG_ZCACHE)		+= zcache/
@@ -72,3 +75,5 @@ obj-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4)	+= ste_rmi4/
 obj-$(CONFIG_DRM_PSB)		+= gma500/
 obj-$(CONFIG_INTEL_MEI)		+= mei/
 obj-$(CONFIG_MFD_NVEC)		+= nvec/
+#$_rbox_$_modify_$
+obj-$(CONFIG_EEPROM_AT24C16)     += rk29/eeprom/

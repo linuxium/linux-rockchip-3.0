@@ -81,9 +81,24 @@ static int do_blktrans_request(struct mtd_blktrans_ops *tr,
 {
 	unsigned long block, nsect;
 	char *buf;
-
+#if 0
 	block = blk_rq_pos(req) << 9 >> tr->blkshift;
 	nsect = blk_rq_cur_bytes(req) >> tr->blkshift;
+#else  //modify by zyf for cap>=4GB 20110120
+	block = blk_rq_pos(req);
+	nsect = blk_rq_cur_bytes(req) >> tr->blkshift;
+    if(tr->blkshift != 9)
+    {
+        if(tr->blkshift > 9)
+        {
+    	    block = blk_rq_pos(req) >> (tr->blkshift - 9);
+        }
+        else
+        {
+	        block = blk_rq_pos(req) << (9 - tr->blkshift);
+        }
+    }
+#endif
 
 	buf = req->buffer;
 
@@ -99,8 +114,8 @@ static int do_blktrans_request(struct mtd_blktrans_ops *tr,
 
 	switch(rq_data_dir(req)) {
 	case READ:
-		for (; nsect > 0; nsect--, block++, buf += tr->blksize)
-			if (tr->readsect(dev, block, buf))
+		//for (; nsect > 0; nsect--, block++, buf += tr->blksize)
+			if (tr->readsect(dev, block,nsect, buf))
 				return -EIO;
 		rq_flush_dcache_pages(req);
 		return 0;
@@ -109,8 +124,8 @@ static int do_blktrans_request(struct mtd_blktrans_ops *tr,
 			return -EIO;
 
 		rq_flush_dcache_pages(req);
-		for (; nsect > 0; nsect--, block++, buf += tr->blksize)
-			if (tr->writesect(dev, block, buf))
+		//for (; nsect > 0; nsect--, block++, buf += tr->blksize)
+			if (tr->writesect(dev, block,nsect, buf))
 				return -EIO;
 		return 0;
 	default:
@@ -415,7 +430,10 @@ int add_mtd_blktrans_dev(struct mtd_blktrans_dev *new)
 		snprintf(gd->disk_name, sizeof(gd->disk_name),
 			 "%s%d", tr->name, new->devnum);
 
-	set_capacity(gd, (new->size * tr->blksize) >> 9);
+	/* 2.5 has capacity in units of 512 bytes while still
+	   having BLOCK_SIZE_BITS set to 10. Just to keep us amused. */
+	//set_capacity(gd, (new->size * tr->blksize) >> 9);
+	set_capacity(gd, (new->size >> 9) * tr->blksize);   //modify by zyf for cap>=4GB 20110120
 
 	/* Create the request queue */
 	spin_lock_init(&new->queue_lock);

@@ -1,6 +1,6 @@
 VERSION = 3
 PATCHLEVEL = 0
-SUBLEVEL = 58
+SUBLEVEL = 36
 EXTRAVERSION =
 NAME = Sneaky Weasel
 
@@ -192,7 +192,17 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
 # Default value for CROSS_COMPILE is not to prefix executables
 # Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
 export KBUILD_BUILDHOST := $(SUBARCH)
-ARCH		?= $(SUBARCH)
+#ARCH		?= $(SUBARCH)
+ARCH		?= arm
+ifneq ($(wildcard ../jb/toolchain/arm-eabi-4.4.3),)
+CROSS_COMPILE	?= ../jb/toolchain/arm-eabi-4.4.3/bin/arm-eabi-
+endif
+ifneq ($(wildcard ../jb/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3),)
+CROSS_COMPILE	?= ../jb/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-
+endif
+ifneq ($(wildcard ../jb/prebuilts/gcc/linux-x86/arm/arm-eabi-4.6),)
+CROSS_COMPILE   ?= ../jb/prebuilts/gcc/linux-x86/arm/arm-eabi-4.6/bin/arm-eabi-
+endif
 CROSS_COMPILE	?= $(CONFIG_CROSS_COMPILE:"%"=%)
 
 # Architecture as present in compile.h
@@ -329,7 +339,11 @@ include $(srctree)/scripts/Kbuild.include
 # Make variables (CC, etc...)
 
 AS		= $(CROSS_COMPILE)as
+ifneq ($(wildcard $(CROSS_COMPILE)ld.bfd),)
+LD		= $(CROSS_COMPILE)ld.bfd
+else
 LD		= $(CROSS_COMPILE)ld
+endif
 CC		= $(CROSS_COMPILE)gcc
 CPP		= $(CC) -E
 AR		= $(CROSS_COMPILE)ar
@@ -1219,7 +1233,7 @@ rpm: include/config/kernel.release FORCE
 # Brief documentation of the typical targets used
 # ---------------------------------------------------------------------------
 
-boards := $(wildcard $(srctree)/arch/$(SRCARCH)/configs/*_defconfig)
+boards := $(wildcard $(srctree)/arch/$(SRCARCH)/configs/rk*_defconfig)
 boards := $(notdir $(boards))
 board-dirs := $(dir $(wildcard $(srctree)/arch/$(SRCARCH)/configs/*/*_defconfig))
 board-dirs := $(sort $(notdir $(board-dirs:/=)))
@@ -1565,3 +1579,7 @@ FORCE:
 # Declare the contents of the .PHONY variable as phony.  We keep that
 # information in a variable so we can use it in if_changed and friends.
 .PHONY: $(PHONY)
+
+
+%.o: %.uu prepare scripts FORCE
+	$(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
