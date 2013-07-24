@@ -628,7 +628,11 @@ static u8 rk30_get_avs_val(void)
 	nandc_writel(nanc_save_reg[0] | 0x1 << 14, 0);
 	nandc_writel(0x5, 0x130);
 
-	nandc_writel(3, 0x158);
+#ifdef CONFIG_ARCH_RK3066B
+ 	nandc_writel(3, 0x158);
+#else
+	nandc_writel(7, 0x158);
+#endif
 	nandc_writel(1, 0x134);
 
 	while(count--) {

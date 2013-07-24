@@ -305,7 +305,7 @@ struct hdmi {
 #define HDMI_SET_3D				(HDMI_SYSFS_SRC		| 7)
 
 #define HDMI_DEFAULT_SCALE		95
-#define HDMI_AUTO_CONFIG		true
+#define HDMI_AUTO_CONFIG		false
 
 // HDMI default vide mode
 #define HDMI_VIDEO_DEFAULT_MODE			HDMI_1280x720p_60HZ//HDMI_1920x1080p_60HZ
