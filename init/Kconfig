@@ -204,6 +204,17 @@ config KERNEL_LZO
 
 endchoice
 
+# oys05 <<+
+config DEFAULT_HOST_VERSION 
+        string "Project hostname"
+        default "(none)"
+        help
+          This option determines the default system hostname before userspace
+          calls sethostname(2). The kernel traditionally uses "(none)" here,
+          but you may wish to use a different default here to make a minimal
+          system more usable with less configuration.
+# oys05 +>>
+
 config DEFAULT_HOSTNAME
 	string "Default hostname"
 	default "(none)"

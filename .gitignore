@@ -32,6 +32,20 @@ modules.builtin
 *.lzo
 *.patch
 *.gcno
+
+*.PR*
+*.PFI*
+*.IAB*
+*.IAD*
+*.IMB*
+*.IMD*
+*.PRI*
+*.PO*
+*.PRI*
+*.PS*
+*.PS*
+*.SearchResults*
+*.WK3*
 Untitled Project.*
 
 #
@@ -53,6 +67,7 @@ Untitled Project.*
 !.gitignore
 !.mailmap
 !.config
+
 #
 # Generated include files
 #

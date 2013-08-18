@@ -463,7 +463,7 @@ static int rk_fb_io_enable(void)
 
 #if defined(CONFIG_LCDC0_RK3188)
 struct rk29fb_info lcdc0_screen_info = {
-	.prop           = EXTEND,       //extend display device
+	.prop           =PRMRY,//yxg 	EXTEND,       //extend display device
        .lcd_info  = NULL,
        .set_screen_info = set_lcd_info,
 
@@ -472,7 +472,7 @@ struct rk29fb_info lcdc0_screen_info = {
 
 #if defined(CONFIG_LCDC1_RK3188)
 struct rk29fb_info lcdc1_screen_info = {
-	.prop	   = PRMRY,		//primary display device
+	.prop	   = EXTEND,//yxg	PRMRY,		//primary display device
 	.io_init   = rk_fb_io_init,
 	.io_disable = rk_fb_io_disable,
 	.io_enable = rk_fb_io_enable,
@@ -986,23 +986,35 @@ static struct rfkill_rk_platform_data rfkill_rk_platdata = {
     .type               = RFKILL_TYPE_BLUETOOTH,
 
     .poweron_gpio       = { // BT_REG_ON
-        .io             = RK30_PIN3_PD1, //RK30_PIN3_PC7,
+        .io             =INVALID_GPIO,//yxg  RK30_PIN3_PC7, //RK30_PIN3_PC7,
         .enable         = GPIO_HIGH,
+        .iomux          = {
+            .name       = "bt_poweron",
+            .fgpio      = GPIO3_C7,
+        },
     },
 
     .reset_gpio         = { // BT_RST
-        .io             = INVALID_GPIO, // set io to INVALID_GPIO for disable it
+        .io             = RK30_PIN3_PD1, // set io to INVALID_GPIO for disable it
         .enable         = GPIO_LOW,
-   }, 
+        .iomux          = {
+            .name       = "bt_reset",
+            .fgpio      = GPIO3_D1,
+       },
+    },
 
     .wake_gpio          = { // BT_WAKE, use to control bt's sleep and wakeup
-        .io             = RK30_PIN3_PC7, // set io to INVALID_GPIO for disable it
+        .io             = RK30_PIN3_PC6, // set io to INVALID_GPIO for disable it
         .enable         = GPIO_HIGH,
+        .iomux          = {
+            .name       = "bt_wake",
+            .fgpio      = GPIO3_C6,
+        },
     },
 
     .wake_host_irq      = { // BT_HOST_WAKE, for bt wakeup host when it is in deep sleep
         .gpio           = {
-            .io         = RK30_PIN3_PC6, // set io to INVALID_GPIO for disable it
+            .io         = RK30_PIN3_PC7, // set io to INVALID_GPIO for disable it
             .enable     = GPIO_LOW,      // set GPIO_LOW for falling, set 0 for rising
             .iomux      = {
                 .name   = NULL,
@@ -1246,7 +1258,7 @@ static int rk_platform_add_display_devices(void)
 //$_rbox_$_modify_$ zhengyang modified for box
 static struct rkdisplay_platform_data hdmi_data = {
 	.property 		= DISPLAY_MAIN,
-	.video_source 	= DISPLAY_SOURCE_LCDC1,
+	.video_source 	= DISPLAY_SOURCE_LCDC0,//yxg		DISPLAY_SOURCE_LCDC1,
 	.io_pwr_pin 	= INVALID_GPIO,
 	.io_reset_pin 	= RK30_PIN3_PB2,
 };
@@ -1901,6 +1913,9 @@ static void __init rk30_i2c_register_board_info(void)
 #define POWER_ON_PIN RK30_PIN0_PA0   //power_hold
 static void rk30_pm_power_off(void)
 {
+      gpio_direction_output(RK30_PIN3_PD3, GPIO_LOW);//rjh ++ for shutdown                                           
+      printk(KERN_ERR "rk30_pm_power_off start...\n");
+
 	printk(KERN_ERR "rk30_pm_power_off start...\n");
 #if defined(CONFIG_MFD_WM831X)
 	wm831x_set_bits(Wm831x,WM831X_GPIO_LEVEL,0x0001,0x0000);  //set sys_pwr 0
@@ -1932,7 +1947,15 @@ static void __init machine_rk30_board_init(void)
 	//avs_init();
 	gpio_request(POWER_ON_PIN, "poweronpin");
 	gpio_direction_output(POWER_ON_PIN, GPIO_HIGH);
-	
+// oys <<+ for LED
+	int pwm_gpio;
+	pwm_gpio = iomux_mode_to_gpio(PWM0);
+	if (gpio_request(pwm_gpio, NULL)) {
+		printk("func %s, line %d: request gpio fail\n", __FUNCTION__, __LINE__);
+		return -1;
+	}
+	gpio_direction_output(pwm_gpio, GPIO_HIGH);
+// oys +>>
 	pm_power_off = rk30_pm_power_off;
 	
         gpio_direction_output(POWER_ON_PIN, GPIO_HIGH);
@@ -2002,8 +2025,8 @@ static struct cpufreq_frequency_table dvfs_arm_table[] = {
         {.frequency = 504 * 1000,       .index = 925 * 1000},
         {.frequency = 816 * 1000,       .index = 1000 * 1000},
         {.frequency = 1008 * 1000,      .index = 1075 * 1000},
-        {.frequency = 1200 * 1000,      .index = 1150 * 1000},
-        {.frequency = 1416 * 1000,      .index = 1250 * 1000},
+        {.frequency = 1608 * 1000,      .index = 1150 * 1000},
+        {.frequency = 1608 * 1000,      .index = 1250 * 1000},
         {.frequency = 1608 * 1000,      .index = 1350 * 1000},
 
 

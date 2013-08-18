@@ -1223,8 +1223,8 @@ static int init_lcdc_device_driver(struct rk_lcdc_device_driver *dev_drv,
 	dev_drv->ovl_mgr	= def_drv->ovl_mgr;
 	dev_drv->fps_mgr	= def_drv->fps_mgr;
 	//$_rbox_$_modify_$_zhengyang added for lut modify
-	dev_drv->x_scale = 100;
-	dev_drv->y_scale = 100;
+	dev_drv->x_scale =95;//yxg   100;
+	dev_drv->y_scale =95;//yxg   100;
 	//$_rbox_$_modify_$end
 	if(def_drv->fb_get_layer)
 		dev_drv->fb_get_layer   = def_drv->fb_get_layer;

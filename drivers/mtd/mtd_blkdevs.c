@@ -153,7 +153,7 @@ static int mtd_blktrans_thread(void *arg)
 	struct request_queue *rq = dev->rq;
 	struct request *req = NULL;
 	int background_done = 0;
-
+	
 	spin_lock_irq(rq->queue_lock);
 
 	while (!kthread_should_stop()) {
